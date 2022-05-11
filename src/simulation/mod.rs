@@ -37,3 +37,25 @@ pub fn lat_lon_elev_to_vec3(lat: f64, lon: f64, elev: f64) -> Vector3<f64> {
 
     Vector3::new(x * lon.sin(), y, x * lon.cos())
 }
+
+pub fn earth_radius(lat_r_gc: f64) -> f64 {
+    let x = lat_r_gc.cos() / R_EQU;
+    let y = lat_r_gc.sin() / R_POL;
+    1.0 / (x * x + y * y).sqrt()
+}
+
+pub fn surface_normal(pos: &Vector3<f64>) -> Vector3<f64> {
+    let v = Vector3::new(
+        pos.x / R_EQU / R_EQU,
+        pos.y / R_POL / R_POL,
+        pos.z / R_EQU / R_EQU,
+    );
+    let v_norm = v.norm();
+    v / v_norm
+}
+
+pub fn r_curv(pos: &Vector3<f64>) -> f64 {
+    let r2 = pos.dot(&pos);
+    let coeff = (R_EQU * R_EQU + R_POL * R_POL - r2).sqrt();
+    coeff * coeff * coeff / R_EQU / R_POL
+}

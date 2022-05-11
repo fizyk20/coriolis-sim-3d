@@ -3,18 +3,21 @@ mod simulation;
 
 use egui::Vec2;
 use glium::glutin;
-use numeric_algs::integration::{Integrator, RK4Integrator, StepSize};
+use numeric_algs::integration::RK4Integrator;
 
 use renderer::Renderer;
 
-use crate::simulation::{Object, Position, Velocity};
+use crate::simulation::{Object, Position, Velocity, OMEGA};
 
 pub struct State {
+    pub t: f64,
     pub omega: f64,
     pub lat: f32,
     pub lon: f32,
     pub distance: f32,
     pub running: bool,
+    pub time_step: f64,
+    pub objects: Vec<Object>,
 }
 
 impl State {
@@ -26,7 +29,7 @@ impl State {
     fn scroll(&mut self, scroll: glutin::event::MouseScrollDelta) {
         use glutin::event::MouseScrollDelta::*;
         match scroll {
-            LineDelta(x, y) => {
+            LineDelta(_x, y) => {
                 self.distance = (self.distance / 2.0_f32.powf(y as f32 * 0.2)).clamp(6378e3, 2e9);
             }
             PixelDelta(pos) => {
@@ -44,16 +47,27 @@ fn main() {
 
     let mut renderer = Renderer::new(&display);
     let mut state = State {
+        t: 0.0,
+        omega: 1.0,
         lat: 0.0,
         lon: 0.0,
         distance: 60e6,
-        omega: 1.0,
         running: false,
+        time_step: 10.0,
+        objects: vec![
+            {
+                let pos = Position::from_lat_lon_elev(52.0, 21.0, 400000.0);
+                let vel = Velocity::from_east_north_up(pos, 7700.0, 0.0, 0.0);
+                Object::new(pos, vel)
+            },
+            {
+                let pos = Position::from_lat_lon_elev(45.0, 0.0, 50000.0);
+                let vel = Velocity::from_east_north_up(pos, 300.0, 300.0, 0.0);
+                Object::new(pos, vel).with_color(0.0, 0.0, 1.0)
+            },
+        ],
     };
 
-    let pos = Position::from_lat_lon_elev(52.0, 21.0, 400000.0);
-    let vel = Velocity::from_east_north_up(pos, 7700.0, 0.0, 0.0);
-    let mut obj = Object::new(pos, vel);
     let mut integrator = RK4Integrator::new(10.0);
 
     event_loop.run(move |event, _, control_flow| {
@@ -80,6 +94,19 @@ fn main() {
                     ui.label(format!("Current view lon: {:4.1}", lon));
                     ui.label("Rotation of the reference frame:");
                     ui.add(egui::Slider::new(&mut state.omega, 0.0..=1.0));
+                    ui.label("Time step:");
+                    ui.add(egui::Slider::new(&mut state.time_step, 1.0..=1000.0).logarithmic(true));
+
+                    ui.label("Objects");
+                    ui.indent(0u64, |ui| {
+                        for (i, obj) in state.objects.iter().enumerate() {
+                            ui.collapsing(format!("Object {}", i), |ui| {
+                                let vel = obj.vel.to_omega(obj.pos, state.omega * OMEGA);
+                                ui.label(format!("Vel = {:5.1} m/s", vel.vel.norm()));
+                            });
+                        }
+                    });
+
                     if ui.button("Quit").clicked() {
                         quit = true;
                     }
@@ -98,7 +125,10 @@ fn main() {
             };
 
             if state.running {
-                integrator.propagate_in_place(&mut obj, Object::derivative, StepSize::UseDefault);
+                for obj in &mut state.objects {
+                    obj.step(&mut integrator, state.time_step);
+                }
+                state.t += state.time_step;
             }
 
             {
@@ -109,7 +139,7 @@ fn main() {
                 target.clear_color(color[0], color[1], color[2], color[3]);
 
                 // draw here
-                renderer.draw(&display, &mut target, &state, &[obj.clone()]);
+                renderer.draw(&display, &mut target, &state);
 
                 egui_glium.paint(&display, &mut target);
 

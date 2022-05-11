@@ -3,10 +3,7 @@ mod mesh;
 use glium::{implement_vertex, uniform, Display, Frame, Program, Surface};
 use nalgebra::{Matrix4, Point3, Vector3};
 
-use crate::{
-    simulation::{Object, OMEGA},
-    State,
-};
+use crate::{simulation::OMEGA, State};
 pub use mesh::Mesh;
 
 const VERTEX_SHADER_SRC: &'static str = r#"
@@ -56,13 +53,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw(
-        &mut self,
-        display: &Display,
-        target: &mut Frame,
-        state: &State,
-        objects: &[Object],
-    ) {
+    pub fn draw(&mut self, display: &Display, target: &mut Frame, state: &State) {
         target.clear_color(0.0, 0.0, 0.02, 1.0);
         target.clear_depth(1.0);
 
@@ -83,7 +74,7 @@ impl Renderer {
             );
 
         let omega = OMEGA * state.omega;
-        let ang = (OMEGA - omega) * objects[0].time();
+        let ang = (OMEGA - omega) * state.t;
 
         let rotation = Matrix4::new_rotation(Vector3::new(0.0, ang as f32, 0.0));
 
@@ -107,7 +98,7 @@ impl Renderer {
             },
         );
 
-        for obj in objects {
+        for obj in &state.objects {
             obj.draw(
                 omega,
                 display,

@@ -17,7 +17,6 @@ impl Mesh {
     pub fn solid_sphere(display: &Display) -> Mesh {
         let n_meridians = 24;
         let n_parallels = 12;
-        let n_subdivisions = 10;
 
         let mut vertices = vec![];
         let mut indices = vec![];

@@ -2,15 +2,18 @@ use std::collections::VecDeque;
 
 use glium::{index, uniform, Display, DrawParameters, Frame, Program, Surface, VertexBuffer};
 use nalgebra::{base::dimension::U7, Matrix4, Vector3, VectorN};
-use numeric_algs::State;
+use numeric_algs::{
+    integration::{Integrator, StepSize},
+    State,
+};
 
-use super::{lat_lon_elev_to_vec3, GM, OMEGA};
+use super::{earth_radius, lat_lon_elev_to_vec3, r_curv, surface_normal, GM, OMEGA};
 use crate::renderer::{Mesh, Vertex};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Position {
-    t: f64,
-    pos: Vector3<f64>,
+    pub t: f64,
+    pub pos: Vector3<f64>,
     // angular velocity of the frame of reference
     omega: f64,
 }
@@ -58,7 +61,7 @@ impl Position {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Velocity {
-    vel: Vector3<f64>,
+    pub vel: Vector3<f64>,
     // angular velocity of the frame of reference
     omega: f64,
 }
@@ -97,7 +100,7 @@ impl Velocity {
 
         let z2 = vel.z + pos.x * dw;
         let x2 = vel.x - pos.z * dw;
-        let vel = Vector3::new(x2 * c - z2 * s, vel.y, -x2 * s + z2 * c);
+        let vel = Vector3::new(x2 * c - z2 * s, vel.y, x2 * s + z2 * c);
 
         Velocity { vel, omega }
     }
@@ -105,14 +108,21 @@ impl Velocity {
 
 const MAX_PATH_LEN: usize = 5000;
 
+#[derive(Debug, Clone, Copy)]
+enum ObjectState {
+    InFlight,
+    OnSurface,
+}
+
 #[derive(Debug, Clone)]
 pub struct Object {
-    pos: Position,
-    vel: Velocity,
+    pub pos: Position,
+    pub vel: Velocity,
     color: (f32, f32, f32),
     path: VecDeque<Position>,
     gm: f64,
     drag_coeff: f64,
+    state: ObjectState,
 }
 
 impl Object {
@@ -124,6 +134,7 @@ impl Object {
             path: VecDeque::new(),
             gm: GM,
             drag_coeff: 0.0,
+            state: ObjectState::InFlight,
         }
     }
 
@@ -155,15 +166,64 @@ impl Object {
         -2.0 * omega_v.cross(&vel.vel)
     }
 
-    pub fn derivative(&self) -> VectorN<f64, U7> {
+    fn derivative_inflight(&self) -> VectorN<f64, U7> {
         let vel = self.vel.to_omega(self.pos, self.pos.omega).vel;
         let acc = self.pos.grav(self.gm) + self.pos.centrifugal() + self.coriolis();
 
         VectorN::<f64, U7>::from_column_slice(&[vel.x, vel.y, vel.z, acc.x, acc.y, acc.z, 1.0])
     }
 
-    pub fn color(&self) -> [f32; 3] {
+    fn derivative_onsurface(&self) -> VectorN<f64, U7> {
+        let vel = self.vel.to_omega(self.pos, self.pos.omega).vel;
+        let mut acc = self.pos.centrifugal() + self.coriolis();
+
+        // make sure that the total vertical acceleration makes the object conform to the curvature
+        // of the surface
+        let up = surface_normal(&self.pos.pos);
+        let v = vel.norm();
+        let r = r_curv(&self.pos.pos);
+        let acc_up = acc.dot(&up);
+        acc += (-v * v / r - acc_up) * up;
+
+        VectorN::<f64, U7>::from_column_slice(&[vel.x, vel.y, vel.z, acc.x, acc.y, acc.z, 1.0])
+    }
+
+    pub fn derivative(&self) -> VectorN<f64, U7> {
+        match self.state {
+            ObjectState::InFlight => self.derivative_inflight(),
+            ObjectState::OnSurface => self.derivative_onsurface(),
+        }
+    }
+
+    fn color(&self) -> [f32; 3] {
         [self.color.0, self.color.1, self.color.2]
+    }
+
+    pub fn step(&mut self, integrator: &mut impl Integrator<Self>, dt: f64) {
+        self.path.push_back(self.pos);
+        if self.path.len() > MAX_PATH_LEN {
+            let _ = self.path.pop_front();
+        }
+        integrator.propagate_in_place(self, Self::derivative, StepSize::Step(dt));
+
+        let pos = self.pos.to_omega(OMEGA);
+        let r = pos.pos.norm();
+        let lat_r_gc = (pos.pos.y / r).asin();
+        let earth_r = earth_radius(lat_r_gc);
+
+        if r < earth_r {
+            self.state = ObjectState::OnSurface;
+            self.pos.pos *= earth_r / r;
+            self.vel.vel *= r / earth_r;
+            // cancel the vertical component of the velocity if negative
+            let normal = surface_normal(&pos.pos);
+            let mut vel = self.vel.to_omega(pos, OMEGA);
+            let v_up = vel.vel.dot(&normal);
+            if v_up < 0.0 {
+                vel.vel -= v_up * normal;
+                self.vel = vel.to_omega(self.pos, self.vel.omega);
+            }
+        }
     }
 
     pub fn draw(
@@ -221,6 +281,36 @@ impl Object {
                 draw_parameters,
             )
             .unwrap();
+
+        let vertex_buffer = VertexBuffer::new(display, {
+            let pos = self.pos.to_omega(omega);
+            let mut vel = self.vel.to_omega(pos, omega);
+            vel.vel /= vel.vel.norm();
+            vel.vel *= 1e6;
+            &[
+                Vertex {
+                    position: [pos.pos.x as f32, pos.pos.y as f32, pos.pos.z as f32],
+                },
+                Vertex {
+                    position: [
+                        (pos.pos.x + vel.vel.x) as f32,
+                        (pos.pos.y + vel.vel.y) as f32,
+                        (pos.pos.z + vel.vel.z) as f32,
+                    ],
+                },
+            ]
+        })
+        .unwrap();
+
+        target
+            .draw(
+                &vertex_buffer,
+                &index_buffer,
+                program,
+                &uniforms,
+                draw_parameters,
+            )
+            .unwrap();
     }
 }
 
@@ -228,10 +318,6 @@ impl State for Object {
     type Derivative = VectorN<f64, U7>;
 
     fn shift_in_place(&mut self, dir: &VectorN<f64, U7>, amount: f64) {
-        self.path.push_back(self.pos);
-        if self.path.len() > MAX_PATH_LEN {
-            let _ = self.path.pop_front();
-        }
         let shift = dir * amount;
         let vel = Vector3::from_column_slice(&shift.as_ref()[0..3]);
         let acc = Vector3::from_column_slice(&shift.as_ref()[3..6]);
