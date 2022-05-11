@@ -123,6 +123,8 @@ pub struct Object {
     gm: f64,
     drag_coeff: f64,
     friction: f64,
+    // position of equilibrium + the "spring" constant
+    pendulum: Option<(Position, f64)>,
     state: ObjectState,
 }
 
@@ -136,6 +138,7 @@ impl Object {
             gm: GM,
             drag_coeff: 0.0,
             friction: 0.0,
+            pendulum: None,
             state: ObjectState::InFlight,
         }
     }
@@ -162,6 +165,13 @@ impl Object {
         Self { friction, ..self }
     }
 
+    pub fn as_pendulum(self, coeff: f64) -> Self {
+        Self {
+            pendulum: Some((self.pos.to_omega(OMEGA), coeff)),
+            ..self
+        }
+    }
+
     pub fn time(&self) -> f64 {
         self.pos.t
     }
@@ -186,11 +196,20 @@ impl Object {
         self.friction * (surf_vel - vel)
     }
 
+    fn pendulum_force(&self) -> Vector3<f64> {
+        if let Some((pos0, k)) = self.pendulum {
+            let pos0 = pos0.to_omega(self.pos.omega);
+            k * (pos0.pos - self.pos.pos)
+        } else {
+            Vector3::zeros()
+        }
+    }
+
     fn derivative_onsurface(&self) -> VectorN<f64, U7> {
         let vel = self.vel.to_omega(self.pos, self.pos.omega).vel;
         // gravity, centrifugal and reaction from the ground should yield a net force equal to the
         // centripetal force according to the local radius of curvature of the surface
-        let mut acc = self.coriolis() + self.friction();
+        let mut acc = self.coriolis() + self.friction() + self.pendulum_force();
 
         // make sure that the total vertical acceleration makes the object conform to the curvature
         // of the surface
@@ -259,7 +278,7 @@ impl Object {
                                 pos.pos.y as f32,
                                 pos.pos.z as f32
                             ))
-                        .prepend_scaling(300e3)).as_ref(),
+                        .prepend_scaling(100e3)).as_ref(),
             color: self.color(),
         };
 
@@ -297,6 +316,8 @@ impl Object {
             )
             .unwrap();
 
+        /*
+        // draw the velocity direction
         let vertex_buffer = VertexBuffer::new(display, {
             let pos = self.pos.to_omega(omega);
             let mut vel = self.vel.to_omega(pos, omega);
@@ -325,7 +346,7 @@ impl Object {
                 &uniforms,
                 draw_parameters,
             )
-            .unwrap();
+            .unwrap();*/
     }
 }
 

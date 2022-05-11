@@ -7,7 +7,7 @@ use numeric_algs::integration::RK4Integrator;
 
 use renderer::Renderer;
 
-use crate::simulation::{Object, Position, Velocity, OMEGA};
+use crate::simulation::{explosion, Object, Position, Velocity, OMEGA};
 
 pub struct State {
     pub t: f64,
@@ -39,6 +39,12 @@ impl State {
     }
 }
 
+fn create_object(lat: f64, lon: f64, elev: f64, v_e: f64, v_n: f64, v_u: f64) -> Object {
+    let pos = Position::from_lat_lon_elev(lat, lon, elev);
+    let vel = Velocity::from_east_north_up(pos, v_e, v_n, v_u);
+    Object::new(pos, vel)
+}
+
 fn main() {
     let event_loop = glutin::event_loop::EventLoop::with_user_event();
     let display = create_display(&event_loop);
@@ -46,6 +52,21 @@ fn main() {
     let mut egui_glium = egui_glium::EguiGlium::new(&display);
 
     let mut renderer = Renderer::new(&display);
+
+    // Anticyclones
+    //let mut objects = explosion(45.0, 0.0, 10e3, 100.0, 10.0, 8, (0.7, 0.7, 0.0));
+    //objects.extend(explosion(-45.0, 0.0, 10e3, 100.0, 10.0, 8, (0.0, 0.7, 0.7)));
+
+    // Foucault pendulums
+    let objects = vec![
+        create_object(60.0, 0.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
+        create_object(45.0, 15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
+        create_object(20.0, 30.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
+        create_object(-20.0, 30.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
+        create_object(-45.0, 15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
+        create_object(-60.0, 0.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
+    ];
+
     let mut state = State {
         t: 0.0,
         omega: 1.0,
@@ -54,20 +75,7 @@ fn main() {
         distance: 60e6,
         running: false,
         time_step: 10.0,
-        objects: vec![
-            {
-                let pos = Position::from_lat_lon_elev(52.0, 21.0, 400000.0);
-                let vel = Velocity::from_east_north_up(pos, 7700.0, 0.0, 0.0);
-                Object::new(pos, vel)
-            },
-            {
-                let pos = Position::from_lat_lon_elev(45.0, 0.0, 50000.0);
-                let vel = Velocity::from_east_north_up(pos, 300.0, 300.0, 0.0);
-                Object::new(pos, vel)
-                    .with_color(0.0, 0.0, 1.0)
-                    .with_friction(1e-3)
-            },
-        ],
+        objects,
     };
 
     let mut integrator = RK4Integrator::new(10.0);

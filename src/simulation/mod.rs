@@ -1,5 +1,7 @@
 mod object;
 
+use std::f64::consts::PI;
+
 use nalgebra::Vector3;
 
 pub use object::{Object, Position, Velocity};
@@ -58,4 +60,26 @@ pub fn r_curv(pos: &Vector3<f64>) -> f64 {
     let r2 = pos.dot(&pos);
     let coeff = (R_EQU * R_EQU + R_POL * R_POL - r2).sqrt();
     coeff * coeff * coeff / R_EQU / R_POL
+}
+
+pub fn explosion(
+    lat: f64,
+    lon: f64,
+    elev: f64,
+    vel: f64,
+    vel_up: f64,
+    num_objects: usize,
+    color: (f32, f32, f32),
+) -> Vec<Object> {
+    let pos = Position::from_lat_lon_elev(lat, lon, elev);
+    (0..num_objects)
+        .into_iter()
+        .map(|index| {
+            let azim = 2.0 * PI / (num_objects as f64) * (index as f64);
+            let vel_n = vel * azim.cos();
+            let vel_e = vel * azim.sin();
+            let vel = Velocity::from_east_north_up(pos, vel_e, vel_n, vel_up);
+            Object::new(pos, vel).with_color(color.0, color.1, color.2)
+        })
+        .collect()
 }
