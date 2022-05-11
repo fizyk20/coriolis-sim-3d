@@ -63,7 +63,9 @@ fn main() {
             {
                 let pos = Position::from_lat_lon_elev(45.0, 0.0, 50000.0);
                 let vel = Velocity::from_east_north_up(pos, 300.0, 300.0, 0.0);
-                Object::new(pos, vel).with_color(0.0, 0.0, 1.0)
+                Object::new(pos, vel)
+                    .with_color(0.0, 0.0, 1.0)
+                    .with_friction(1e-3)
             },
         ],
     };

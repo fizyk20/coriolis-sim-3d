@@ -122,6 +122,7 @@ pub struct Object {
     path: VecDeque<Position>,
     gm: f64,
     drag_coeff: f64,
+    friction: f64,
     state: ObjectState,
 }
 
@@ -134,6 +135,7 @@ impl Object {
             path: VecDeque::new(),
             gm: GM,
             drag_coeff: 0.0,
+            friction: 0.0,
             state: ObjectState::InFlight,
         }
     }
@@ -156,6 +158,10 @@ impl Object {
         }
     }
 
+    pub fn with_friction(self, friction: f64) -> Self {
+        Self { friction, ..self }
+    }
+
     pub fn time(&self) -> f64 {
         self.pos.t
     }
@@ -173,9 +179,18 @@ impl Object {
         VectorN::<f64, U7>::from_column_slice(&[vel.x, vel.y, vel.z, acc.x, acc.y, acc.z, 1.0])
     }
 
+    fn friction(&self) -> Vector3<f64> {
+        let o = OMEGA - self.pos.omega;
+        let vel = self.vel.to_omega(self.pos, self.pos.omega).vel;
+        let surf_vel = Vector3::new(o * self.pos.pos.z, 0.0, -o * self.pos.pos.x);
+        self.friction * (surf_vel - vel)
+    }
+
     fn derivative_onsurface(&self) -> VectorN<f64, U7> {
         let vel = self.vel.to_omega(self.pos, self.pos.omega).vel;
-        let mut acc = self.pos.centrifugal() + self.coriolis();
+        // gravity, centrifugal and reaction from the ground should yield a net force equal to the
+        // centripetal force according to the local radius of curvature of the surface
+        let mut acc = self.coriolis() + self.friction();
 
         // make sure that the total vertical acceleration makes the object conform to the curvature
         // of the surface
