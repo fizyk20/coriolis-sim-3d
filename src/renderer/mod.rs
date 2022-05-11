@@ -7,7 +7,7 @@ use crate::{
     simulation::{Object, OMEGA},
     State,
 };
-use mesh::Mesh;
+pub use mesh::Mesh;
 
 const VERTEX_SHADER_SRC: &'static str = r#"
     #version 140
@@ -108,16 +108,12 @@ impl Renderer {
         );
 
         for obj in objects {
-            let uniforms = uniform! {
-                matrix: *(matrix.prepend_scaling(1.0)).as_ref(),
-                color: obj.color(),
-            };
             obj.draw(
                 omega,
                 display,
                 target,
                 &self.program,
-                &uniforms,
+                &matrix,
                 &glium::DrawParameters {
                     depth: glium::draw_parameters::Depth {
                         test: glium::draw_parameters::DepthTest::IfLess,

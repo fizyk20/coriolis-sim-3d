@@ -1,13 +1,11 @@
 use std::collections::VecDeque;
 
-use glium::{
-    index, uniforms::Uniforms, Display, DrawParameters, Frame, Program, Surface, VertexBuffer,
-};
-use nalgebra::{base::dimension::U7, Vector3, VectorN};
+use glium::{index, uniform, Display, DrawParameters, Frame, Program, Surface, VertexBuffer};
+use nalgebra::{base::dimension::U7, Matrix4, Vector3, VectorN};
 use numeric_algs::State;
 
 use super::{lat_lon_elev_to_vec3, GM, OMEGA};
-use crate::renderer::Vertex;
+use crate::renderer::{Mesh, Vertex};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Position {
@@ -168,15 +166,36 @@ impl Object {
         [self.color.0, self.color.1, self.color.2]
     }
 
-    pub fn draw<U: Uniforms>(
+    pub fn draw(
         &self,
         omega: f64,
         display: &Display,
         target: &mut Frame,
         program: &Program,
-        uniforms: &U,
+        matrix: &Matrix4<f32>,
         draw_parameters: &DrawParameters,
     ) {
+        let pos = self.pos.to_omega(omega);
+        let uniforms = uniform! {
+            matrix: *(matrix
+                        .prepend_translation(
+                            &Vector3::new(
+                                pos.pos.x as f32,
+                                pos.pos.y as f32,
+                                pos.pos.z as f32
+                            ))
+                        .prepend_scaling(300e3)).as_ref(),
+            color: self.color(),
+        };
+
+        let sphere = Mesh::solid_sphere(display);
+        sphere.draw(target, program, &uniforms, draw_parameters);
+
+        let uniforms = uniform! {
+            matrix: *matrix.as_ref(),
+            color: self.color(),
+        };
+
         let vertex_buffer = VertexBuffer::new(
             display,
             &self
@@ -198,7 +217,7 @@ impl Object {
                 &vertex_buffer,
                 &index_buffer,
                 program,
-                uniforms,
+                &uniforms,
                 draw_parameters,
             )
             .unwrap();
