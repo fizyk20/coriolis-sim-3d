@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::{collections::VecDeque, rc::Rc};
 
 use glium::{index, uniform, Display, DrawParameters, Frame, Program, Surface, VertexBuffer};
 use nalgebra::{base::dimension::U7, Matrix4, Vector3, VectorN};
@@ -15,7 +15,7 @@ pub struct Position {
     pub t: f64,
     pub pos: Vector3<f64>,
     // angular velocity of the frame of reference
-    omega: f64,
+    pub omega: f64,
 }
 
 impl Position {
@@ -114,7 +114,7 @@ enum ObjectState {
     OnSurface,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Object {
     pub pos: Position,
     pub vel: Velocity,
@@ -125,8 +125,7 @@ pub struct Object {
     gm: f64,
     drag_coeff: f64,
     friction: f64,
-    // position of equilibrium + the "spring" constant
-    pendulum: Option<(Position, f64)>,
+    attractor: Option<Rc<Box<dyn Fn(Position) -> Vector3<f64>>>>,
     state: ObjectState,
 }
 
@@ -142,7 +141,7 @@ impl Object {
             gm: GM,
             drag_coeff: 0.0,
             friction: 0.0,
-            pendulum: None,
+            attractor: None,
             state: ObjectState::InFlight,
         }
     }
@@ -174,8 +173,19 @@ impl Object {
     }
 
     pub fn as_pendulum(self, coeff: f64) -> Self {
+        let pos0 = self.pos;
+        let boxed_closure: Box<dyn Fn(Position) -> Vector3<f64>> =
+            Box::new(move |pos: Position| coeff * (pos0.to_omega(pos.omega).pos - pos.pos));
+        let attractor = Rc::new(boxed_closure);
         Self {
-            pendulum: Some((self.pos.to_omega(OMEGA), coeff)),
+            attractor: Some(attractor),
+            ..self
+        }
+    }
+
+    pub fn with_attractor(self, attractor: Box<dyn Fn(Position) -> Vector3<f64>>) -> Self {
+        Self {
+            attractor: Some(Rc::new(attractor)),
             ..self
         }
     }
@@ -204,10 +214,9 @@ impl Object {
         self.friction * (surf_vel - vel)
     }
 
-    fn pendulum_force(&self) -> Vector3<f64> {
-        if let Some((pos0, k)) = self.pendulum {
-            let pos0 = pos0.to_omega(self.pos.omega);
-            k * (pos0.pos - self.pos.pos)
+    fn attraction_force(&self) -> Vector3<f64> {
+        if let Some(attractor) = self.attractor.as_ref() {
+            attractor(self.pos)
         } else {
             Vector3::zeros()
         }
@@ -217,7 +226,7 @@ impl Object {
         let vel = self.vel.to_omega(self.pos, self.pos.omega).vel;
         // gravity, centrifugal and reaction from the ground should yield a net force equal to the
         // centripetal force according to the local radius of curvature of the surface
-        let mut acc = self.coriolis() + self.friction() + self.pendulum_force();
+        let mut acc = self.coriolis() + self.friction() + self.attraction_force();
 
         // make sure that the total vertical acceleration makes the object conform to the curvature
         // of the surface

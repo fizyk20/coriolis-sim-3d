@@ -110,11 +110,13 @@ pub fn cyclone(
     lon: f64,
     elev: f64,
     radius: f64,
+    attractor_coeff: f64,
     vel: f64,
     vel_up: f64,
     num_objects: usize,
     color: (f32, f32, f32),
 ) -> Vec<Object> {
+    let center_pos = Position::from_lat_lon_elev(lat, lon, elev);
     (0..num_objects)
         .into_iter()
         .map(|index| {
@@ -127,6 +129,11 @@ pub fn cyclone(
             Object::new(pos, vel)
                 .with_color(color.0, color.1, color.2)
                 .with_radius(100e3)
+                .with_attractor(Box::new(move |pos| {
+                    let pos_diff = center_pos.to_omega(pos.omega).pos - pos.pos;
+                    let pos_norm = pos_diff.norm();
+                    pos_diff / pos_norm / pos_norm * attractor_coeff
+                }))
         })
         .collect()
 }

@@ -58,24 +58,33 @@ fn main() {
     //let objects = vec![create_object(52.0, 0.0, 400e3, 7700.0, 0.0, 0.0)];
 
     // Anticyclones
-    //let mut objects = anticyclone(45.0, 0.0, 10e3, 100.0, 10.0, 8, (0.7, 0.7, 0.0));
-    //objects.extend(anticyclone(-45.0, 0.0, 10e3, 100.0, 10.0, 8, (0.0, 0.7, 0.7)));
+    /*let mut objects = anticyclone(45.0, 0.0, 10e3, 100.0, 10.0, 8, (0.7, 0.7, 0.0));
+    objects.extend(anticyclone(
+        -45.0,
+        0.0,
+        10e3,
+        100.0,
+        10.0,
+        8,
+        (0.0, 0.7, 0.7),
+    ));*/
 
     // Cyclones
-    let mut objects = cyclone(45.0, 0.0, 10e3, 1e6, 100.0, 10.0, 8, (0.7, 0.7, 0.0));
+    /*let mut objects = cyclone(45.0, 0.0, 10e3, 1e6, 2e4, 100.0, 10.0, 8, (0.7, 0.7, 0.0));
     objects.extend(cyclone(
         -45.0,
         0.0,
         10e3,
         1e6,
+        2e4,
         100.0,
         10.0,
         8,
         (0.0, 0.7, 0.7),
-    ));
+    ));*/
 
     // Foucault pendulums
-    /*let objects = vec![
+    let objects = vec![
         create_object(89.9, 0.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
         create_object(75.0, -15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
         create_object(60.0, 15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
@@ -89,7 +98,7 @@ fn main() {
         create_object(-60.0, 15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
         create_object(-75.0, -15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
         create_object(-89.9, 15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
-    ];*/
+    ];
 
     let mut state = State {
         t: 0.0,
