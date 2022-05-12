@@ -12,6 +12,7 @@ use crate::simulation::{explosion, Object, Position, Velocity, OMEGA};
 pub struct State {
     pub t: f64,
     pub omega: f64,
+    pub ang: f64,
     pub lat: f32,
     pub lon: f32,
     pub distance: f32,
@@ -70,6 +71,7 @@ fn main() {
     let mut state = State {
         t: 0.0,
         omega: 1.0,
+        ang: 0.0,
         lat: 0.0,
         lon: 0.0,
         distance: 60e6,
@@ -97,7 +99,7 @@ fn main() {
                 egui::Window::new("Simulation data").show(egui_ctx, |ui| {
                     ui.checkbox(&mut state.running, "Simulation running");
                     ui.label(format!("Current view lat: {:3.1}", state.lat.to_degrees()));
-                    let mut lon = state.lon.to_degrees();
+                    let mut lon = state.lon.to_degrees() % 360.0;
                     if lon > 180.0 {
                         lon -= 360.0;
                     }
@@ -139,6 +141,7 @@ fn main() {
                     obj.step(&mut integrator, state.time_step);
                 }
                 state.t += state.time_step;
+                state.ang += state.omega * OMEGA * state.time_step;
             }
 
             {
@@ -193,7 +196,7 @@ fn create_display(event_loop: &glutin::event_loop::EventLoop<()>) -> glium::Disp
         .with_title("Coriolis Demo 3D");
 
     let context_builder = glutin::ContextBuilder::new()
-        .with_depth_buffer(16)
+        .with_depth_buffer(24)
         .with_srgb(true)
         .with_stencil_buffer(0)
         .with_vsync(true);
