@@ -131,9 +131,13 @@ fn main() {
                 egui::Window::new("Simulation data").show(egui_ctx, |ui| {
                     ui.checkbox(&mut state.running, "Simulation running");
                     ui.label(format!("Current view lat: {:3.1}", state.lat.to_degrees()));
-                    let mut lon = state.lon.to_degrees() % 360.0;
+                    let mut lon =
+                        (state.lon as f64 + state.ang - OMEGA * state.t).to_degrees() % 360.0;
                     if lon > 180.0 {
                         lon -= 360.0;
+                    }
+                    if lon < -180.0 {
+                        lon += 360.0;
                     }
                     ui.label(format!("Current view lon: {:4.1}", lon));
                     ui.label("Rotation of the reference frame:");
