@@ -119,6 +119,8 @@ pub struct Object {
     pub pos: Position,
     pub vel: Velocity,
     color: (f32, f32, f32),
+    radius: f32,
+    draw_velocity: bool,
     path: VecDeque<Position>,
     gm: f64,
     drag_coeff: f64,
@@ -134,6 +136,8 @@ impl Object {
             pos,
             vel,
             color: (1.0, 0.0, 0.0),
+            radius: 200e3,
+            draw_velocity: false,
             path: VecDeque::new(),
             gm: GM,
             drag_coeff: 0.0,
@@ -148,6 +152,10 @@ impl Object {
             color: (r, g, b),
             ..self
         }
+    }
+
+    pub fn with_radius(self, radius: f32) -> Self {
+        Self { radius, ..self }
     }
 
     pub fn with_gm(self, gm: f64) -> Self {
@@ -278,7 +286,7 @@ impl Object {
                                 pos.pos.y as f32,
                                 pos.pos.z as f32
                             ))
-                        .prepend_scaling(100e3)).as_ref(),
+                        .prepend_scaling(self.radius)).as_ref(),
             color: self.color(),
         };
 
@@ -316,37 +324,38 @@ impl Object {
             )
             .unwrap();
 
-        /*
-        // draw the velocity direction
-        let vertex_buffer = VertexBuffer::new(display, {
-            let pos = self.pos.to_omega(omega);
-            let mut vel = self.vel.to_omega(pos, omega);
-            vel.vel /= vel.vel.norm();
-            vel.vel *= 1e6;
-            &[
-                Vertex {
-                    position: [pos.pos.x as f32, pos.pos.y as f32, pos.pos.z as f32],
-                },
-                Vertex {
-                    position: [
-                        (pos.pos.x + vel.vel.x) as f32,
-                        (pos.pos.y + vel.vel.y) as f32,
-                        (pos.pos.z + vel.vel.z) as f32,
-                    ],
-                },
-            ]
-        })
-        .unwrap();
+        if self.draw_velocity {
+            // draw the velocity direction
+            let vertex_buffer = VertexBuffer::new(display, {
+                let pos = self.pos.to_omega(omega);
+                let mut vel = self.vel.to_omega(pos, omega);
+                vel.vel /= vel.vel.norm();
+                vel.vel *= 1e6;
+                &[
+                    Vertex {
+                        position: [pos.pos.x as f32, pos.pos.y as f32, pos.pos.z as f32],
+                    },
+                    Vertex {
+                        position: [
+                            (pos.pos.x + vel.vel.x) as f32,
+                            (pos.pos.y + vel.vel.y) as f32,
+                            (pos.pos.z + vel.vel.z) as f32,
+                        ],
+                    },
+                ]
+            })
+            .unwrap();
 
-        target
-            .draw(
-                &vertex_buffer,
-                &index_buffer,
-                program,
-                &uniforms,
-                draw_parameters,
-            )
-            .unwrap();*/
+            target
+                .draw(
+                    &vertex_buffer,
+                    &index_buffer,
+                    program,
+                    &uniforms,
+                    draw_parameters,
+                )
+                .unwrap();
+        }
     }
 }
 

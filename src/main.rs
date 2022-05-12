@@ -7,7 +7,7 @@ use numeric_algs::integration::RK4Integrator;
 
 use renderer::Renderer;
 
-use crate::simulation::{explosion, Object, Position, Velocity, OMEGA};
+use crate::simulation::{anticyclone, cyclone, Object, Position, Velocity, OMEGA};
 
 pub struct State {
     pub t: f64,
@@ -55,11 +55,24 @@ fn main() {
     let mut renderer = Renderer::new(&display);
 
     // A satellite
-    let objects = vec![create_object(52.0, 0.0, 400e3, 7700.0, 0.0, 0.0)];
+    //let objects = vec![create_object(52.0, 0.0, 400e3, 7700.0, 0.0, 0.0)];
 
     // Anticyclones
-    //let mut objects = explosion(45.0, 0.0, 10e3, 100.0, 10.0, 8, (0.7, 0.7, 0.0));
-    //objects.extend(explosion(-45.0, 0.0, 10e3, 100.0, 10.0, 8, (0.0, 0.7, 0.7)));
+    //let mut objects = anticyclone(45.0, 0.0, 10e3, 100.0, 10.0, 8, (0.7, 0.7, 0.0));
+    //objects.extend(anticyclone(-45.0, 0.0, 10e3, 100.0, 10.0, 8, (0.0, 0.7, 0.7)));
+
+    // Cyclones
+    let mut objects = cyclone(45.0, 0.0, 10e3, 1e6, 100.0, 10.0, 8, (0.7, 0.7, 0.0));
+    objects.extend(cyclone(
+        -45.0,
+        0.0,
+        10e3,
+        1e6,
+        100.0,
+        10.0,
+        8,
+        (0.0, 0.7, 0.7),
+    ));
 
     // Foucault pendulums
     /*let objects = vec![
