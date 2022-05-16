@@ -1,49 +1,24 @@
+mod interface;
 mod renderer;
 mod simulation;
+mod state;
 
-use egui::Vec2;
 use glium::glutin;
 use numeric_algs::integration::RK4Integrator;
 
 use renderer::Renderer;
 
-use crate::simulation::{anticyclone, cyclone, Object, Position, Velocity, OMEGA};
+use crate::{
+    simulation::OMEGA,
+    state::{ObjectDescription, ObjectKind, ObjectKindTag, State},
+};
 
-pub struct State {
-    pub t: f64,
-    pub omega: f64,
-    pub ang: f64,
-    pub lat: f32,
-    pub lon: f32,
-    pub distance: f32,
-    pub running: bool,
-    pub time_step: f64,
-    pub objects: Vec<Object>,
-}
+use interface::display_object;
 
-impl State {
-    fn drag(&mut self, drag_delta: Vec2) {
-        self.lat = (self.lat + drag_delta.y * 0.01).clamp(-1.57, 1.57);
-        self.lon = (self.lon - drag_delta.x * 0.01) % 6.2831853;
-    }
-
-    fn scroll(&mut self, scroll: glutin::event::MouseScrollDelta) {
-        use glutin::event::MouseScrollDelta::*;
-        match scroll {
-            LineDelta(_x, y) => {
-                self.distance = (self.distance / 2.0_f32.powf(y as f32 * 0.2)).clamp(6378e3, 2e9);
-            }
-            PixelDelta(pos) => {
-                println!("PixelDelta({:?})", pos);
-            }
-        }
-    }
-}
-
-fn create_object(lat: f64, lon: f64, elev: f64, v_e: f64, v_n: f64, v_u: f64) -> Object {
-    let pos = Position::from_lat_lon_elev(lat, lon, elev);
-    let vel = Velocity::from_east_north_up(pos, v_e, v_n, v_u);
-    Object::new(pos, vel)
+enum EditResult {
+    None,
+    Ok,
+    Cancel,
 }
 
 fn main() {
@@ -54,12 +29,22 @@ fn main() {
 
     let mut renderer = Renderer::new(&display);
 
+    let mut state = State::default();
+
     // A satellite
-    //let objects = vec![create_object(52.0, 0.0, 400e3, 7700.0, 0.0, 0.0)];
+    //state.objects.push(create_object(52.0, 0.0, 400e3, 7700.0, 0.0, 0.0)]);
 
     // Anticyclones
-    /*let mut objects = anticyclone(45.0, 0.0, 10e3, 100.0, 10.0, 8, (0.7, 0.7, 0.0));
-    objects.extend(anticyclone(
+    /*state.objects.extend(anticyclone(
+        45.0,
+        0.0,
+        10e3,
+        100.0,
+        10.0,
+        8,
+        (0.7, 0.7, 0.0),
+    ));
+    state.objects.extend(anticyclone(
         -45.0,
         0.0,
         10e3,
@@ -70,8 +55,18 @@ fn main() {
     ));*/
 
     // Cyclones
-    /*let mut objects = cyclone(45.0, 0.0, 10e3, 1e6, 2e4, 100.0, 10.0, 8, (0.7, 0.7, 0.0));
-    objects.extend(cyclone(
+    /*state.objects.extend(cyclone(
+        45.0,
+        0.0,
+        10e3,
+        1e6,
+        2e4,
+        100.0,
+        10.0,
+        8,
+        (0.7, 0.7, 0.0),
+    ));
+    state.objects.extend(cyclone(
         -45.0,
         0.0,
         10e3,
@@ -84,7 +79,7 @@ fn main() {
     ));*/
 
     // Foucault pendulums
-    let objects = vec![
+    /*state.objects.extend(vec![
         create_object(89.9, 0.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
         create_object(75.0, -15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
         create_object(60.0, 15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
@@ -98,19 +93,7 @@ fn main() {
         create_object(-60.0, 15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
         create_object(-75.0, -15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
         create_object(-89.9, 15.0, 1e3, 0.0, 1000.0, 0.0).as_pendulum(2e-6),
-    ];
-
-    let mut state = State {
-        t: 0.0,
-        omega: 1.0,
-        ang: 0.0,
-        lat: 0.0,
-        lon: 0.0,
-        distance: 60e6,
-        running: false,
-        time_step: 10.0,
-        objects,
-    };
+    ]);*/
 
     let mut integrator = RK4Integrator::new(10.0);
 
@@ -129,8 +112,16 @@ fn main() {
                     });
 
                 egui::Window::new("Simulation data").show(egui_ctx, |ui| {
-                    ui.checkbox(&mut state.running, "Simulation running");
-                    ui.label(format!("Current view lat: {:3.1}", state.lat.to_degrees()));
+                    if state.running {
+                        if ui.button("Pause simulation").clicked() {
+                            state.running = false;
+                        }
+                    } else {
+                        if ui.button("Resume simulation").clicked() {
+                            state.running = true;
+                        }
+                    }
+                    ui.label(format!("Current lat: {:3.1}", state.lat.to_degrees()));
                     let mut lon =
                         (state.lon as f64 + state.ang - OMEGA * state.t).to_degrees() % 360.0;
                     if lon > 180.0 {
@@ -139,11 +130,17 @@ fn main() {
                     if lon < -180.0 {
                         lon += 360.0;
                     }
-                    ui.label(format!("Current view lon: {:4.1}", lon));
+                    ui.label(format!("Current lon: {:4.1}", lon));
                     ui.label("Rotation of the reference frame:");
                     ui.add(egui::Slider::new(&mut state.omega, 0.0..=1.0));
                     ui.label("Time step:");
                     ui.add(egui::Slider::new(&mut state.time_step, 1.0..=1000.0).logarithmic(true));
+
+                    let _ = ui.separator();
+
+                    if ui.button("Edit state").clicked() {
+                        state.new_state_def = Some(state.current_state_def.clone());
+                    }
 
                     ui.label("Objects");
                     ui.indent(0u64, |ui| {
@@ -159,6 +156,87 @@ fn main() {
                         quit = true;
                     }
                 });
+
+                let mut edit_result = EditResult::None;
+                if let Some(ref mut new_state_def) = state.new_state_def {
+                    egui::Window::new("Editing state").show(egui_ctx, |ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Object to add:");
+                            egui::ComboBox::from_label("")
+                                .selected_text(format!("{}", new_state_def.selected_kind))
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(
+                                        &mut new_state_def.selected_kind,
+                                        ObjectKindTag::Free,
+                                        format!("{}", ObjectKindTag::Free),
+                                    );
+                                    ui.selectable_value(
+                                        &mut new_state_def.selected_kind,
+                                        ObjectKindTag::Cyclone,
+                                        format!("{}", ObjectKindTag::Cyclone),
+                                    );
+                                    ui.selectable_value(
+                                        &mut new_state_def.selected_kind,
+                                        ObjectKindTag::Anticyclone,
+                                        format!("{}", ObjectKindTag::Anticyclone),
+                                    );
+                                    ui.selectable_value(
+                                        &mut new_state_def.selected_kind,
+                                        ObjectKindTag::Foucault,
+                                        format!("{}", ObjectKindTag::Foucault),
+                                    );
+                                });
+                            if ui.button("Add").clicked() {
+                                let new_object_kind = match new_state_def.selected_kind {
+                                    ObjectKindTag::Free => ObjectKind::default_free(),
+                                    ObjectKindTag::Cyclone => ObjectKind::default_cyclone(),
+                                    ObjectKindTag::Anticyclone => ObjectKind::default_anticyclone(),
+                                    ObjectKindTag::Foucault => ObjectKind::default_foucault(),
+                                };
+                                let new_object = ObjectDescription {
+                                    kind: new_object_kind,
+                                    ..Default::default()
+                                };
+                                new_state_def.objects.push(new_object);
+                            }
+                        });
+                        ui.separator();
+                        let mut to_remove: Option<usize> = None;
+                        egui::ScrollArea::vertical()
+                            .max_height(300.0)
+                            .show(ui, |ui| {
+                                for (index, obj) in new_state_def.objects.iter_mut().enumerate() {
+                                    if display_object(obj, ui) {
+                                        to_remove = Some(index);
+                                    }
+                                }
+                            });
+                        if let Some(index) = to_remove {
+                            new_state_def.objects.remove(index);
+                        }
+                        ui.separator();
+                        ui.horizontal(|ui| {
+                            if ui.button("OK").clicked() {
+                                edit_result = EditResult::Ok;
+                            }
+                            if ui.button("Cancel").clicked() {
+                                edit_result = EditResult::Cancel;
+                            }
+                        });
+                    });
+                }
+                match edit_result {
+                    EditResult::None => (),
+                    EditResult::Cancel => {
+                        state.new_state_def = None;
+                    }
+                    EditResult::Ok => {
+                        if let Some(new_state) = state.new_state_def.take() {
+                            state.current_state_def = new_state;
+                            state.reset_state();
+                        }
+                    }
+                }
             });
 
             let needs_repaint = needs_repaint || true;
