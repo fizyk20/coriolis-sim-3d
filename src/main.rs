@@ -121,6 +121,14 @@ fn main() {
                             state.running = true;
                         }
                     }
+                    ui.checkbox(&mut state.draw_solid_surface, "Draw solid surface");
+                    ui.checkbox(&mut state.draw_velocities, "Draw velocities");
+                    ui.label("Velocity scale:");
+                    ui.add(egui::Slider::new(&mut state.vel_scale, 1e1..=1e8).logarithmic(true));
+                    ui.checkbox(&mut state.draw_forces, "Draw forces");
+                    ui.label("Force scale:");
+                    ui.add(egui::Slider::new(&mut state.force_scale, 1e2..=1e9).logarithmic(true));
+
                     ui.label(format!("Current lat: {:3.1}", state.lat.to_degrees()));
                     let mut lon =
                         (state.lon as f64 + state.ang - OMEGA * state.t).to_degrees() % 360.0;

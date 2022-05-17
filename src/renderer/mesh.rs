@@ -166,6 +166,92 @@ impl Mesh {
         Mesh { vertices, indices }
     }
 
+    pub fn arrow(display: &Display) -> Mesh {
+        let n_divisions: u32 = 24;
+
+        let head_len = 0.25f32;
+        let radius = head_len / 6.0;
+
+        let mut vertices = vec![
+            Vertex {
+                position: [0.0, 0.0, 1.0], // tip
+            },
+            Vertex {
+                position: [0.0, 0.0, 1.0 - head_len], // middle of the base of the cone
+            },
+        ];
+
+        // vertices for the head
+        for i in 0..n_divisions {
+            let ang = (i as f32 * 360.0 / n_divisions as f32).to_radians();
+            vertices.push(Vertex {
+                position: [
+                    3.0 * radius * ang.cos(),
+                    3.0 * radius * ang.sin(),
+                    1.0 - head_len,
+                ],
+            });
+        }
+
+        // vertices for the shaft
+        for i in 0..n_divisions {
+            let ang = (i as f32 * 360.0 / n_divisions as f32).to_radians();
+            vertices.push(Vertex {
+                position: [radius * ang.cos(), radius * ang.sin(), 1.0 - head_len],
+            });
+            vertices.push(Vertex {
+                position: [radius * ang.cos(), radius * ang.sin(), 0.0],
+            });
+        }
+
+        // middle of the end of the shaft
+        vertices.push(Vertex {
+            position: [0.0, 0.0, 0.0],
+        });
+
+        let vertices = VertexBuffer::new(display, &vertices).unwrap();
+
+        let mut indices = vec![];
+
+        let mut head_cone = vec![0u32];
+        for i in 0..n_divisions {
+            head_cone.push(i + 2);
+        }
+        head_cone.push(2);
+        indices.push(
+            IndexBuffer::new(display, index::PrimitiveType::TriangleFan, &head_cone).unwrap(),
+        );
+
+        let mut head_base = vec![1];
+        for i in 0..n_divisions {
+            head_base.push(i + 2);
+        }
+        head_base.push(2);
+        indices.push(
+            IndexBuffer::new(display, index::PrimitiveType::TriangleFan, &head_base).unwrap(),
+        );
+
+        let mut shaft_base = vec![2 + n_divisions * 3];
+        for i in 0..n_divisions {
+            shaft_base.push(2 + n_divisions + i * 2 + 1);
+        }
+        shaft_base.push(2 + n_divisions + 1);
+        indices.push(
+            IndexBuffer::new(display, index::PrimitiveType::TriangleFan, &shaft_base).unwrap(),
+        );
+
+        let mut shaft = vec![];
+        for i in 0..n_divisions * 2 {
+            shaft.push(2 + n_divisions + i);
+        }
+        shaft.push(2 + n_divisions);
+        shaft.push(2 + n_divisions + 1);
+        indices
+            .push(IndexBuffer::new(display, index::PrimitiveType::TriangleStrip, &shaft).unwrap());
+
+        Mesh { vertices, indices }
+    }
+
     pub fn draw<U: Uniforms>(
         &self,
         target: &mut Frame,

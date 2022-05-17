@@ -50,8 +50,9 @@ implement_vertex!(Vertex, position);
 pub struct Renderer {
     program: Program,
     earth_solid_sphere: Mesh,
+    earth_grid: Mesh,
     object_solid_sphere: Mesh,
-    sphere: Mesh,
+    arrow: Mesh,
     cubemap: Cubemap,
 }
 
@@ -90,8 +91,9 @@ impl Renderer {
             program: Program::from_source(display, VERTEX_SHADER_SRC, FRAGMENT_SHADER_SRC, None)
                 .unwrap(),
             earth_solid_sphere: Mesh::solid_sphere(display, 120, 240),
+            earth_grid: Mesh::ellipsoid(display),
+            arrow: Mesh::arrow(display),
             object_solid_sphere: Mesh::solid_sphere(display, 12, 24),
-            sphere: Mesh::ellipsoid(display),
             cubemap: Cubemap::new(display),
         }
     }
@@ -142,25 +144,27 @@ impl Renderer {
             &draw_parameters,
         );
 
-        let scaling = Matrix4::new_nonuniform_scaling(&Vector3::new(
-            (R_EQU * 0.995) as f32,
-            (R_POL * 0.995) as f32,
-            (R_EQU * 0.995) as f32,
-        ));
-        let uniforms = uniform! {
-            matrix: *(matrix * earth_rotation * scaling).as_ref(),
-            color: [0.1_f32, 0.25, 0.1],
-        };
+        if state.draw_solid_surface {
+            let scaling = Matrix4::new_nonuniform_scaling(&Vector3::new(
+                (R_EQU * 0.995) as f32,
+                (R_POL * 0.995) as f32,
+                (R_EQU * 0.995) as f32,
+            ));
+            let uniforms = uniform! {
+                matrix: *(matrix * earth_rotation * scaling).as_ref(),
+                color: [0.1_f32, 0.25, 0.1],
+            };
 
-        self.earth_solid_sphere
-            .draw(target, &self.program, &uniforms, &draw_parameters);
+            self.earth_solid_sphere
+                .draw(target, &self.program, &uniforms, &draw_parameters);
+        }
 
         let uniforms = uniform! {
             matrix: *(matrix * earth_rotation).as_ref(),
             color: [0.4_f32, 1.0, 0.4],
         };
 
-        self.sphere
+        self.earth_grid
             .draw(target, &self.program, &uniforms, &draw_parameters);
 
         let obj_ang = 0.0;
@@ -177,7 +181,15 @@ impl Renderer {
         };
 
         for obj in &state.objects {
-            obj.draw(&mut painter, omega, &(matrix * obj_rotation));
+            obj.draw(
+                &mut painter,
+                omega,
+                &(matrix * obj_rotation),
+                state.draw_velocities,
+                state.draw_forces,
+                state.vel_scale,
+                state.force_scale,
+            );
         }
     }
 }
@@ -221,5 +233,14 @@ impl<'a, 'b, 'c, 'd, 'e> Painter<'a, 'b, 'c, 'd, 'e> {
                 self.draw_parameters,
             )
             .unwrap();
+    }
+
+    pub fn arrow<U: Uniforms>(&mut self, uniforms: &U) {
+        self.renderer.arrow.draw(
+            self.target,
+            &self.renderer.program,
+            uniforms,
+            self.draw_parameters,
+        );
     }
 }

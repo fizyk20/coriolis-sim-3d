@@ -20,6 +20,11 @@ pub struct State {
     pub objects: Vec<Object>,
     pub current_state_def: InitialStateDefinition,
     pub new_state_def: Option<InitialStateDefinition>,
+    pub draw_solid_surface: bool,
+    pub draw_velocities: bool,
+    pub draw_forces: bool,
+    pub vel_scale: f64,
+    pub force_scale: f64,
 }
 
 impl Default for State {
@@ -36,6 +41,11 @@ impl Default for State {
             objects: vec![],
             current_state_def: Default::default(),
             new_state_def: None,
+            draw_solid_surface: true,
+            draw_velocities: false,
+            draw_forces: false,
+            vel_scale: 10e3,
+            force_scale: 10e3,
         }
     }
 }

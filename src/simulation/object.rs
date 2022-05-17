@@ -104,6 +104,11 @@ impl Velocity {
 
         Velocity { vel, omega }
     }
+
+    fn coriolis(&self) -> Vector3<f64> {
+        let omega_v = Vector3::new(0.0, self.omega, 0.0);
+        -2.0 * omega_v.cross(&self.vel)
+    }
 }
 
 const MAX_PATH_LEN: usize = 5000;
@@ -120,7 +125,6 @@ pub struct Object {
     pub vel: Velocity,
     color: (f32, f32, f32),
     radius: f32,
-    draw_velocity: bool,
     path: VecDeque<Position>,
     gm: f64,
     drag_coeff: f64,
@@ -136,7 +140,6 @@ impl Object {
             vel,
             color: (1.0, 0.0, 0.0),
             radius: 200e3,
-            draw_velocity: false,
             path: VecDeque::new(),
             gm: GM,
             drag_coeff: 0.0,
@@ -194,15 +197,10 @@ impl Object {
         self.pos.t
     }
 
-    fn coriolis(&self) -> Vector3<f64> {
-        let omega_v = Vector3::new(0.0, self.pos.omega, 0.0);
-        let vel = self.vel.to_omega(self.pos, self.pos.omega);
-        -2.0 * omega_v.cross(&vel.vel)
-    }
-
     fn derivative_inflight(&self) -> VectorN<f64, U7> {
-        let vel = self.vel.to_omega(self.pos, self.pos.omega).vel;
-        let acc = self.pos.grav(self.gm) + self.pos.centrifugal() + self.coriolis();
+        let vel = self.vel.to_omega(self.pos, self.pos.omega);
+        let acc = self.pos.grav(self.gm) + self.pos.centrifugal() + vel.coriolis();
+        let vel = vel.vel;
 
         VectorN::<f64, U7>::from_column_slice(&[vel.x, vel.y, vel.z, acc.x, acc.y, acc.z, 1.0])
     }
@@ -223,10 +221,11 @@ impl Object {
     }
 
     fn derivative_onsurface(&self) -> VectorN<f64, U7> {
-        let vel = self.vel.to_omega(self.pos, self.pos.omega).vel;
+        let vel = self.vel.to_omega(self.pos, self.pos.omega);
         // gravity, centrifugal and reaction from the ground should yield a net force equal to the
         // centripetal force according to the local radius of curvature of the surface
-        let mut acc = self.coriolis() + self.friction() + self.attraction_force();
+        let mut acc = vel.coriolis() + self.friction() + self.attraction_force();
+        let vel = vel.vel;
 
         // make sure that the total vertical acceleration makes the object conform to the curvature
         // of the surface
@@ -282,17 +281,19 @@ impl Object {
         painter: &mut Painter<'_, '_, '_, '_, '_>,
         omega: f64,
         matrix: &Matrix4<f32>,
+        draw_velocity: bool,
+        draw_forces: bool,
+        vel_scale: f64,
+        force_scale: f64,
     ) {
         let pos = self.pos.to_omega(omega);
+        let matrix_trans = matrix.prepend_translation(&Vector3::new(
+            pos.pos.x as f32,
+            pos.pos.y as f32,
+            pos.pos.z as f32,
+        ));
         let uniforms = uniform! {
-            matrix: *(matrix
-                        .prepend_translation(
-                            &Vector3::new(
-                                pos.pos.x as f32,
-                                pos.pos.y as f32,
-                                pos.pos.z as f32
-                            ))
-                        .prepend_scaling(self.radius)).as_ref(),
+            matrix: *(matrix_trans.prepend_scaling(self.radius)).as_ref(),
             color: self.color(),
         };
 
@@ -315,13 +316,52 @@ impl Object {
                 .collect::<Vec<_>>(),
         );
 
-        if self.draw_velocity {
+        if draw_velocity {
             // draw the velocity direction
-            /*let pos = self.pos.to_omega(omega);
+            let pos = self.pos.to_omega(omega);
             let mut vel = self.vel.to_omega(pos, omega);
-            vel.vel /= vel.vel.norm();
-            vel.vel *= 1e6;*/
+            vel.vel *= vel_scale;
+
+            self.draw_vector(vel.vel, painter, &matrix_trans, self.color());
         }
+
+        if draw_forces {
+            let pos = self.pos.to_omega(omega);
+            let vel = self.vel.to_omega(self.pos, omega);
+            let grav = pos.grav(self.gm) * force_scale;
+            let centri = pos.centrifugal() * force_scale;
+            let coriolis = vel.coriolis() * force_scale;
+
+            self.draw_vector(grav, painter, &matrix_trans, [0.5, 0.5, 0.0]);
+            self.draw_vector(centri, painter, &matrix_trans, [0.3, 1.0, 0.3]);
+            self.draw_vector(coriolis, painter, &matrix_trans, [0.0, 1.0, 1.0]);
+        }
+    }
+
+    fn draw_vector(
+        &self,
+        vec: Vector3<f64>,
+        painter: &mut Painter<'_, '_, '_, '_, '_>,
+        matrix: &Matrix4<f32>,
+        color: [f32; 3],
+    ) {
+        let len = vec.norm();
+        let ang_x = (vec.y / len).asin() as f32;
+        let ang_y = vec.x.atan2(vec.z) as f32;
+
+        let rot_x = Matrix4::new_rotation(Vector3::new(-ang_x, 0.0, 0.0));
+        let rot_y = Matrix4::new_rotation(Vector3::new(0.0, ang_y, 0.0));
+        let scale = Matrix4::new_nonuniform_scaling(&Vector3::new(
+            1.0,
+            1.0,
+            len as f32 / self.radius / 8.0,
+        ));
+        let scale2 = Matrix4::new_scaling(self.radius * 8.0);
+
+        let matrix = matrix * rot_y * rot_x * scale * scale2;
+
+        let uniforms = uniform! { matrix: *matrix.as_ref(), color: color };
+        painter.arrow(&uniforms);
     }
 }
 
