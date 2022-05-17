@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, rc::Rc};
 
-use glium::{index, uniform, Display, DrawParameters, Frame, Program, Surface, VertexBuffer};
+use glium::uniform;
 use nalgebra::{base::dimension::U7, Matrix4, Vector3, VectorN};
 use numeric_algs::{
     integration::{Integrator, StepSize},
@@ -8,7 +8,7 @@ use numeric_algs::{
 };
 
 use super::{earth_radius, lat_lon_elev_to_vec3, r_curv, surface_normal, GM, OMEGA};
-use crate::renderer::{Mesh, Vertex};
+use crate::renderer::Painter;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Position {
@@ -279,12 +279,9 @@ impl Object {
 
     pub fn draw(
         &self,
+        painter: &mut Painter<'_, '_, '_, '_, '_>,
         omega: f64,
-        display: &Display,
-        target: &mut Frame,
-        program: &Program,
         matrix: &Matrix4<f32>,
-        draw_parameters: &DrawParameters,
     ) {
         let pos = self.pos.to_omega(omega);
         let uniforms = uniform! {
@@ -299,71 +296,31 @@ impl Object {
             color: self.color(),
         };
 
-        let sphere = Mesh::solid_sphere(display, 12, 24);
-        sphere.draw(target, program, &uniforms, draw_parameters);
+        painter.solid_sphere(&uniforms);
 
         let uniforms = uniform! {
             matrix: *matrix.as_ref(),
             color: self.color(),
         };
 
-        let vertex_buffer = VertexBuffer::new(
-            display,
+        painter.path(
+            &uniforms,
             &self
                 .path
                 .iter()
                 .map(|pos| {
                     let pos = pos.to_omega(omega);
-                    Vertex {
-                        position: [pos.pos.x as f32, pos.pos.y as f32, pos.pos.z as f32],
-                    }
+                    Vector3::new(pos.pos.x as f32, pos.pos.y as f32, pos.pos.z as f32)
                 })
                 .collect::<Vec<_>>(),
-        )
-        .unwrap();
-        let index_buffer = index::NoIndices(index::PrimitiveType::LineStrip);
-
-        target
-            .draw(
-                &vertex_buffer,
-                &index_buffer,
-                program,
-                &uniforms,
-                draw_parameters,
-            )
-            .unwrap();
+        );
 
         if self.draw_velocity {
             // draw the velocity direction
-            let vertex_buffer = VertexBuffer::new(display, {
-                let pos = self.pos.to_omega(omega);
-                let mut vel = self.vel.to_omega(pos, omega);
-                vel.vel /= vel.vel.norm();
-                vel.vel *= 1e6;
-                &[
-                    Vertex {
-                        position: [pos.pos.x as f32, pos.pos.y as f32, pos.pos.z as f32],
-                    },
-                    Vertex {
-                        position: [
-                            (pos.pos.x + vel.vel.x) as f32,
-                            (pos.pos.y + vel.vel.y) as f32,
-                            (pos.pos.z + vel.vel.z) as f32,
-                        ],
-                    },
-                ]
-            })
-            .unwrap();
-
-            target
-                .draw(
-                    &vertex_buffer,
-                    &index_buffer,
-                    program,
-                    &uniforms,
-                    draw_parameters,
-                )
-                .unwrap();
+            /*let pos = self.pos.to_omega(omega);
+            let mut vel = self.vel.to_omega(pos, omega);
+            vel.vel /= vel.vel.norm();
+            vel.vel *= 1e6;*/
         }
     }
 }

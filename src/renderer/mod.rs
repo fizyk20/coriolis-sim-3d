@@ -1,7 +1,10 @@
 mod cubemap;
 mod mesh;
 
-use glium::{implement_vertex, uniform, Display, Frame, Program, Surface};
+use glium::{
+    implement_vertex, index, uniform, uniforms::Uniforms, Display, DrawParameters, Frame, Program,
+    Surface, VertexBuffer,
+};
 use nalgebra::{Matrix4, Vector3};
 
 use crate::{
@@ -47,6 +50,7 @@ implement_vertex!(Vertex, position);
 pub struct Renderer {
     program: Program,
     earth_solid_sphere: Mesh,
+    object_solid_sphere: Mesh,
     sphere: Mesh,
     cubemap: Cubemap,
 }
@@ -86,6 +90,7 @@ impl Renderer {
             program: Program::from_source(display, VERTEX_SHADER_SRC, FRAGMENT_SHADER_SRC, None)
                 .unwrap(),
             earth_solid_sphere: Mesh::solid_sphere(display, 120, 240),
+            object_solid_sphere: Mesh::solid_sphere(display, 12, 24),
             sphere: Mesh::ellipsoid(display),
             cubemap: Cubemap::new(display),
         }
@@ -161,18 +166,60 @@ impl Renderer {
         let obj_ang = 0.0;
         let obj_rotation = Matrix4::new_rotation(Vector3::new(0.0, obj_ang as f32, 0.0));
 
+        let mut painter = Painter {
+            display,
+            renderer: self,
+            target,
+            draw_parameters: &glium::DrawParameters {
+                line_width: Some(6.0),
+                ..draw_parameters.clone()
+            },
+        };
+
         for obj in &state.objects {
-            obj.draw(
-                omega,
-                display,
-                target,
-                &self.program,
-                &(matrix * obj_rotation),
-                &glium::DrawParameters {
-                    line_width: Some(6.0),
-                    ..draw_parameters.clone()
-                },
-            );
+            obj.draw(&mut painter, omega, &(matrix * obj_rotation));
         }
+    }
+}
+
+pub struct Painter<'a, 'b, 'c, 'd, 'e> {
+    display: &'a Display,
+    renderer: &'b Renderer,
+    target: &'c mut Frame,
+    draw_parameters: &'d DrawParameters<'e>,
+}
+
+impl<'a, 'b, 'c, 'd, 'e> Painter<'a, 'b, 'c, 'd, 'e> {
+    pub fn solid_sphere<U: Uniforms>(&mut self, uniforms: &U) {
+        self.renderer.object_solid_sphere.draw(
+            self.target,
+            &self.renderer.program,
+            uniforms,
+            self.draw_parameters,
+        );
+    }
+
+    pub fn path<U: Uniforms>(&mut self, uniforms: &U, path: &[Vector3<f32>]) {
+        let vertex_buffer = VertexBuffer::new(
+            self.display,
+            &path
+                .iter()
+                .map(|pos| Vertex {
+                    position: [pos.x, pos.y, pos.z],
+                })
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        let index_buffer = index::NoIndices(index::PrimitiveType::LineStrip);
+
+        self.target
+            .draw(
+                &vertex_buffer,
+                &index_buffer,
+                &self.renderer.program,
+                uniforms,
+                self.draw_parameters,
+            )
+            .unwrap();
     }
 }
