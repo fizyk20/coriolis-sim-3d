@@ -299,7 +299,7 @@ impl Object {
             color: self.color(),
         };
 
-        let sphere = Mesh::solid_sphere(display);
+        let sphere = Mesh::solid_sphere(display, 12, 24);
         sphere.draw(target, program, &uniforms, draw_parameters);
 
         let uniforms = uniform! {

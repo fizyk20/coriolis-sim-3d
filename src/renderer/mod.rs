@@ -4,7 +4,10 @@ mod mesh;
 use glium::{implement_vertex, uniform, Display, Frame, Program, Surface};
 use nalgebra::{Matrix4, Vector3};
 
-use crate::{simulation::OMEGA, State};
+use crate::{
+    simulation::{OMEGA, R_EQU, R_POL},
+    State,
+};
 use cubemap::Cubemap;
 pub use mesh::Mesh;
 
@@ -43,7 +46,7 @@ implement_vertex!(Vertex, position);
 
 pub struct Renderer {
     program: Program,
-    solid_sphere: Mesh,
+    earth_solid_sphere: Mesh,
     sphere: Mesh,
     cubemap: Cubemap,
 }
@@ -82,7 +85,7 @@ impl Renderer {
         Renderer {
             program: Program::from_source(display, VERTEX_SHADER_SRC, FRAGMENT_SHADER_SRC, None)
                 .unwrap(),
-            solid_sphere: Mesh::solid_sphere(display),
+            earth_solid_sphere: Mesh::solid_sphere(display, 120, 240),
             sphere: Mesh::ellipsoid(display),
             cubemap: Cubemap::new(display),
         }
@@ -134,12 +137,17 @@ impl Renderer {
             &draw_parameters,
         );
 
+        let scaling = Matrix4::new_nonuniform_scaling(&Vector3::new(
+            (R_EQU * 0.995) as f32,
+            (R_POL * 0.995) as f32,
+            (R_EQU * 0.995) as f32,
+        ));
         let uniforms = uniform! {
-            matrix: *(matrix * earth_rotation * Matrix4::new_scaling(6356e3)).as_ref(),
+            matrix: *(matrix * earth_rotation * scaling).as_ref(),
             color: [0.1_f32, 0.25, 0.1],
         };
 
-        self.solid_sphere
+        self.earth_solid_sphere
             .draw(target, &self.program, &uniforms, &draw_parameters);
 
         let uniforms = uniform! {

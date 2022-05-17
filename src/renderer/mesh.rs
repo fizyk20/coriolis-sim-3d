@@ -14,10 +14,7 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    pub fn solid_sphere(display: &Display) -> Mesh {
-        let n_meridians = 24;
-        let n_parallels = 12;
-
+    pub fn solid_sphere(display: &Display, n_parallels: u32, n_meridians: u32) -> Mesh {
         let mut vertices = vec![];
         let mut indices = vec![];
 
