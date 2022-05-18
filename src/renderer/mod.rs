@@ -82,7 +82,7 @@ fn galactic_matrix() -> Matrix4<f32> {
         matrix[8 + i] = pos_z[i];
     }
 
-    matrix //.transpose()
+    matrix
 }
 
 impl Renderer {
