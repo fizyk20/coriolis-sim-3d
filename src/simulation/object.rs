@@ -1,4 +1,4 @@
-use std::{collections::VecDeque, rc::Rc};
+use std::{collections::VecDeque, iter, rc::Rc};
 
 use glium::uniform;
 use nalgebra::{base::dimension::U7, Matrix4, Vector3, VectorN};
@@ -283,7 +283,18 @@ impl Object {
         matrix: &Matrix4<f32>,
         render_settings: &RenderSettings,
     ) {
-        let pos = self.pos.to_omega(omega);
+        let positions: Vec<_> = self
+            .path
+            .iter()
+            .copied()
+            .chain(iter::once(self.pos))
+            .enumerate()
+            .take_while(|(i, pos)| *i == 0 || pos.t < render_settings.max_t)
+            .map(|(_, pos)| pos)
+            .collect();
+
+        let pos = positions.last().unwrap().to_omega(omega);
+
         let matrix_trans = matrix.prepend_translation(&Vector3::new(
             pos.pos.x as f32,
             pos.pos.y as f32,
@@ -303,8 +314,7 @@ impl Object {
 
         painter.path(
             &uniforms,
-            &self
-                .path
+            &positions
                 .iter()
                 .map(|pos| {
                     let pos = pos.to_omega(omega);

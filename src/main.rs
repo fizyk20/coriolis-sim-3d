@@ -37,6 +37,14 @@ fn main() {
         let mut redraw = || {
             let mut quit = false;
 
+            if state.running {
+                for obj in &mut state.objects {
+                    obj.step(&mut integrator, state.time_step);
+                }
+                state.t += state.time_step;
+                state.ang += state.omega * OMEGA * state.time_step;
+            }
+
             let needs_repaint = egui_glium.run(&display, |egui_ctx| {
                 egui::CentralPanel::default()
                     .frame(egui::Frame::none())
@@ -62,6 +70,15 @@ fn main() {
                             state.reset_state();
                         }
                     });
+
+                    if state.running {
+                        state.render_settings.max_t = state.t;
+                    }
+                    ui.label("Time range to render:");
+                    ui.add(egui::Slider::new(
+                        &mut state.render_settings.max_t,
+                        0.0..=state.t,
+                    ));
 
                     ui.separator();
 
@@ -220,14 +237,6 @@ fn main() {
             } else {
                 glutin::event_loop::ControlFlow::Poll
             };
-
-            if state.running {
-                for obj in &mut state.objects {
-                    obj.step(&mut integrator, state.time_step);
-                }
-                state.t += state.time_step;
-                state.ang += state.omega * OMEGA * state.time_step;
-            }
 
             {
                 use glium::Surface as _;

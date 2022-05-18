@@ -14,6 +14,7 @@ pub struct RenderSettings {
     pub draw_forces: bool,
     pub vel_scale: f64,
     pub force_scale: f64,
+    pub max_t: f64,
 }
 
 impl Default for RenderSettings {
@@ -24,6 +25,7 @@ impl Default for RenderSettings {
             draw_forces: false,
             vel_scale: 1e4,
             force_scale: 1e4,
+            max_t: 0.0,
         }
     }
 }
