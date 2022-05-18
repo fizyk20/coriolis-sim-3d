@@ -8,7 +8,7 @@ use numeric_algs::{
 };
 
 use super::{earth_radius, lat_lon_elev_to_vec3, r_curv, surface_normal, GM, OMEGA};
-use crate::renderer::Painter;
+use crate::{renderer::Painter, state::RenderSettings};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Position {
@@ -111,7 +111,7 @@ impl Velocity {
     }
 }
 
-const MAX_PATH_LEN: usize = 5000;
+const MAX_PATH_LEN: usize = 50000;
 
 #[derive(Debug, Clone, Copy)]
 enum ObjectState {
@@ -281,10 +281,7 @@ impl Object {
         painter: &mut Painter<'_, '_, '_, '_, '_>,
         omega: f64,
         matrix: &Matrix4<f32>,
-        draw_velocity: bool,
-        draw_forces: bool,
-        vel_scale: f64,
-        force_scale: f64,
+        render_settings: &RenderSettings,
     ) {
         let pos = self.pos.to_omega(omega);
         let matrix_trans = matrix.prepend_translation(&Vector3::new(
@@ -316,21 +313,21 @@ impl Object {
                 .collect::<Vec<_>>(),
         );
 
-        if draw_velocity {
+        if render_settings.draw_velocities {
             // draw the velocity direction
             let pos = self.pos.to_omega(omega);
             let mut vel = self.vel.to_omega(pos, omega);
-            vel.vel *= vel_scale;
+            vel.vel *= render_settings.vel_scale;
 
             self.draw_vector(vel.vel, painter, &matrix_trans, self.color());
         }
 
-        if draw_forces {
+        if render_settings.draw_forces {
             let pos = self.pos.to_omega(omega);
             let vel = self.vel.to_omega(self.pos, omega);
-            let grav = pos.grav(self.gm) * force_scale;
-            let centri = pos.centrifugal() * force_scale;
-            let coriolis = vel.coriolis() * force_scale;
+            let grav = pos.grav(self.gm) * render_settings.force_scale;
+            let centri = pos.centrifugal() * render_settings.force_scale;
+            let coriolis = vel.coriolis() * render_settings.force_scale;
 
             self.draw_vector(grav, painter, &matrix_trans, [0.5, 0.5, 0.0]);
             self.draw_vector(centri, painter, &matrix_trans, [0.3, 1.0, 0.3]);

@@ -144,7 +144,7 @@ impl Renderer {
             &draw_parameters,
         );
 
-        if state.draw_solid_surface {
+        if state.render_settings.draw_solid_surface {
             let scaling = Matrix4::new_nonuniform_scaling(&Vector3::new(
                 (R_EQU * 0.995) as f32,
                 (R_POL * 0.995) as f32,
@@ -185,10 +185,7 @@ impl Renderer {
                 &mut painter,
                 omega,
                 &(matrix * obj_rotation),
-                state.draw_velocities,
-                state.draw_forces,
-                state.vel_scale,
-                state.force_scale,
+                &state.render_settings,
             );
         }
     }
