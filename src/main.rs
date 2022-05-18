@@ -62,6 +62,9 @@ fn main() {
                             state.reset_state();
                         }
                     });
+
+                    ui.separator();
+
                     ui.checkbox(
                         &mut state.render_settings.draw_solid_surface,
                         "Draw solid surface",
@@ -82,6 +85,8 @@ fn main() {
                             .logarithmic(true),
                     );
 
+                    ui.separator();
+
                     ui.label(format!("Current lat: {:3.1}", state.lat.to_degrees()));
                     let mut lon =
                         (state.lon as f64 + state.ang - OMEGA * state.t).to_degrees() % 360.0;
@@ -92,12 +97,15 @@ fn main() {
                         lon += 360.0;
                     }
                     ui.label(format!("Current lon: {:4.1}", lon));
+
+                    ui.separator();
+
                     ui.label("Rotation of the reference frame:");
                     ui.add(egui::Slider::new(&mut state.omega, 0.0..=1.0));
                     ui.label("Time step:");
                     ui.add(egui::Slider::new(&mut state.time_step, 1.0..=1000.0).logarithmic(true));
 
-                    let _ = ui.separator();
+                    ui.separator();
 
                     if ui.button("Edit state").clicked() {
                         state.new_state_def = Some(state.current_state_def.clone());
@@ -112,6 +120,8 @@ fn main() {
                             });
                         }
                     });
+
+                    ui.separator();
 
                     if ui.button("Quit").clicked() {
                         quit = true;
