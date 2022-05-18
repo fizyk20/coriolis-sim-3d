@@ -112,15 +112,20 @@ fn main() {
                     });
 
                 egui::Window::new("Simulation data").show(egui_ctx, |ui| {
-                    if state.running {
-                        if ui.button("Pause simulation").clicked() {
-                            state.running = false;
+                    ui.horizontal(|ui| {
+                        if state.running {
+                            if ui.button("Pause simulation").clicked() {
+                                state.running = false;
+                            }
+                        } else {
+                            if ui.button("Resume simulation").clicked() {
+                                state.running = true;
+                            }
                         }
-                    } else {
-                        if ui.button("Resume simulation").clicked() {
-                            state.running = true;
+                        if ui.button("Reset").clicked() {
+                            state.reset_state();
                         }
-                    }
+                    });
                     ui.checkbox(&mut state.draw_solid_surface, "Draw solid surface");
                     ui.checkbox(&mut state.draw_velocities, "Draw velocities");
                     ui.label("Velocity scale:");
