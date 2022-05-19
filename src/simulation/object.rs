@@ -125,7 +125,7 @@ pub struct Object {
     pub vel: Velocity,
     color: (f32, f32, f32),
     radius: f32,
-    path: VecDeque<Position>,
+    path: VecDeque<(Position, Velocity)>,
     gm: f64,
     drag_coeff: f64,
     friction: f64,
@@ -250,7 +250,7 @@ impl Object {
     }
 
     pub fn step(&mut self, integrator: &mut impl Integrator<Self>, dt: f64) {
-        self.path.push_back(self.pos);
+        self.path.push_back((self.pos, self.vel));
         if self.path.len() > MAX_PATH_LEN {
             let _ = self.path.pop_front();
         }
@@ -287,13 +287,14 @@ impl Object {
             .path
             .iter()
             .copied()
-            .chain(iter::once(self.pos))
+            .chain(iter::once((self.pos, self.vel)))
             .enumerate()
-            .take_while(|(i, pos)| *i == 0 || pos.t < render_settings.max_t)
+            .take_while(|(i, pos)| *i == 0 || pos.0.t < render_settings.max_t)
             .map(|(_, pos)| pos)
             .collect();
 
-        let pos = positions.last().unwrap().to_omega(omega);
+        let pos = positions.last().unwrap().0.to_omega(omega);
+        let vel = positions.last().unwrap().1.to_omega(pos, omega);
 
         let matrix_trans = matrix.prepend_translation(&Vector3::new(
             pos.pos.x as f32,
@@ -317,7 +318,7 @@ impl Object {
             &positions
                 .iter()
                 .map(|pos| {
-                    let pos = pos.to_omega(omega);
+                    let pos = pos.0.to_omega(omega);
                     Vector3::new(pos.pos.x as f32, pos.pos.y as f32, pos.pos.z as f32)
                 })
                 .collect::<Vec<_>>(),
@@ -325,16 +326,12 @@ impl Object {
 
         if render_settings.draw_velocities {
             // draw the velocity direction
-            let pos = self.pos.to_omega(omega);
-            let mut vel = self.vel.to_omega(pos, omega);
-            vel.vel *= render_settings.vel_scale;
+            let vel = vel.vel * render_settings.vel_scale;
 
-            self.draw_vector(vel.vel, painter, &matrix_trans, self.color());
+            self.draw_vector(vel, painter, &matrix_trans, self.color());
         }
 
         if render_settings.draw_forces {
-            let pos = self.pos.to_omega(omega);
-            let vel = self.vel.to_omega(self.pos, omega);
             let grav = pos.grav(self.gm) * render_settings.force_scale;
             let centri = pos.centrifugal() * render_settings.force_scale;
             let coriolis = vel.coriolis() * render_settings.force_scale;
