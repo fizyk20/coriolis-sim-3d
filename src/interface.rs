@@ -33,6 +33,8 @@ pub fn display_object(obj: &mut ObjectDescription, ui: &mut Ui) -> bool {
             vel_e,
             vel_n,
             vel_u,
+            friction,
+            gravity,
         } => {
             ui.horizontal(|ui| {
                 ui.label("Velocity east:");
@@ -48,6 +50,15 @@ pub fn display_object(obj: &mut ObjectDescription, ui: &mut Ui) -> bool {
                 ui.label("Velocity up:");
                 ui.text_edit_singleline(vel_u);
                 ui.label("m/s");
+            });
+            ui.horizontal(|ui| {
+                ui.label("Strength of gravity:");
+                ui.text_edit_singleline(gravity);
+                ui.label("g");
+            });
+            ui.horizontal(|ui| {
+                ui.label("Friction coefficient:");
+                ui.text_edit_singleline(friction);
             });
         }
         ObjectKind::Cyclone {

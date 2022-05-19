@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::simulation::{Object, Position, Velocity};
+use crate::simulation::{Object, Position, Velocity, GM};
 
 use super::utils::*;
 
@@ -29,6 +29,8 @@ pub enum ObjectKind {
         vel_n: String,
         vel_e: String,
         vel_u: String,
+        gravity: String,
+        friction: String,
     },
     Cyclone {
         n_particles: String,
@@ -51,6 +53,8 @@ impl ObjectKind {
             vel_n: "0".to_string(),
             vel_e: "0".to_string(),
             vel_u: "0".to_string(),
+            gravity: "1".to_string(),
+            friction: "0".to_string(),
         }
     }
 
@@ -126,10 +130,14 @@ impl ObjectDescription {
                 vel_n,
                 vel_e,
                 vel_u,
+                gravity,
+                friction,
             } => {
                 let vel_e = vel_e.parse().unwrap_or(0.0);
                 let vel_n = vel_n.parse().unwrap_or(0.0);
                 let vel_u = vel_u.parse().unwrap_or(0.0);
+                let gravity = gravity.parse().unwrap_or(1.0);
+                let friction = friction.parse().unwrap_or(0.0);
                 vec![create_object(
                     self.lat_f(),
                     self.lon_f(),
@@ -138,7 +146,9 @@ impl ObjectDescription {
                     vel_n,
                     vel_u,
                 )
-                .with_color(self.color[0], self.color[1], self.color[2])]
+                .with_color(self.color[0], self.color[1], self.color[2])
+                .with_gm(GM * gravity)
+                .with_friction(friction)]
             }
             ObjectKind::Cyclone {
                 n_particles,
