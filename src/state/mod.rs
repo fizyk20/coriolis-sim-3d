@@ -36,6 +36,8 @@ pub struct State {
     pub ang: f64,
     pub lat: f32,
     pub lon: f32,
+    pub tilt: f32,
+    pub turn: f32,
     pub distance: f32,
     pub running: bool,
     pub time_step: f64,
@@ -53,6 +55,8 @@ impl Default for State {
             ang: 0.0,
             lat: 0.0,
             lon: 0.0,
+            tilt: 0.0,
+            turn: 0.0,
             distance: 60e6,
             running: false,
             time_step: 10.0,
@@ -68,6 +72,11 @@ impl State {
     pub fn drag(&mut self, drag_delta: Vec2) {
         self.lat = (self.lat + drag_delta.y * 0.01).clamp(-1.57, 1.57);
         self.lon = (self.lon - drag_delta.x * 0.01) % 6.2831853;
+    }
+
+    pub fn shift_drag(&mut self, drag_delta: Vec2) {
+        self.tilt = (self.tilt + drag_delta.y * 0.01).clamp(-1.57, 1.57);
+        self.turn = (self.turn + drag_delta.x * 0.01).clamp(-3.14, 3.14);
     }
 
     pub fn scroll(&mut self, scroll: glutin::event::MouseScrollDelta) {

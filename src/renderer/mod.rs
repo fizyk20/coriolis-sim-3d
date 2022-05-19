@@ -121,7 +121,9 @@ impl Renderer {
         let view_rot = Matrix4::new_rotation(Vector3::new(lat as f32, 0.0, 0.0))
             * Matrix4::new_rotation(Vector3::new(0.0, -lon - camera_ang as f32, 0.0));
         let view_trans = Matrix4::new_translation(&Vector3::new(0.0, 0.0, -dist));
-        let matrix = perspective * view_trans * view_rot;
+        let camera_orient = Matrix4::new_rotation(Vector3::new(0.0, state.turn, 0.0))
+            * Matrix4::new_rotation(Vector3::new(state.tilt, 0.0, 0.0));
+        let matrix = perspective * camera_orient * view_trans * view_rot;
 
         let earth_rotation = Matrix4::new_rotation(Vector3::new(0.0, earth_ang as f32, 0.0));
         let skybox_rotation = Matrix4::new_rotation(Vector3::new(0.0, skybox_ang as f32, 0.0));
@@ -140,7 +142,7 @@ impl Renderer {
 
         self.cubemap.draw(
             target,
-            &(perspective * view_rot * skybox_rotation * galactic_pole_rot),
+            &(perspective * camera_orient * view_rot * skybox_rotation * galactic_pole_rot),
             &draw_parameters,
         );
 

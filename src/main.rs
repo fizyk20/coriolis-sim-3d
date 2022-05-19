@@ -52,7 +52,11 @@ fn main() {
                         let available_size = ui.available_size();
                         let (id, rect) = ui.allocate_space(available_size);
                         let response = ui.interact(rect, id, egui::Sense::drag());
-                        state.drag(response.drag_delta());
+                        if ui.input().modifiers.shift {
+                            state.shift_drag(response.drag_delta());
+                        } else {
+                            state.drag(response.drag_delta());
+                        }
                     });
 
                 egui::Window::new("Simulation data").show(egui_ctx, |ui| {
