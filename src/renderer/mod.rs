@@ -107,9 +107,9 @@ impl Renderer {
 
         let omega = OMEGA * state.omega;
         // how much has Earth rotated since t=0
-        let earth_ang = (OMEGA - omega) * state.t;
+        let earth_ang = (OMEGA - omega) * state.render_settings.max_t;
         // how much has the frame rotated with respect to the sky
-        let skybox_ang = -omega * state.t;
+        let skybox_ang = -omega * state.render_settings.max_t;
 
         let dist = state.distance;
         let lat = state.lat;
