@@ -9,7 +9,9 @@ use crate::simulation::Object;
 pub use description::{InitialStateDefinition, ObjectDescription, ObjectKind, ObjectKindTag};
 
 pub struct RenderSettings {
+    pub draw_grid: bool,
     pub draw_solid_surface: bool,
+    pub use_texture: bool,
     pub draw_velocities: bool,
     pub draw_forces: bool,
     pub vel_scale: f64,
@@ -20,7 +22,9 @@ pub struct RenderSettings {
 impl Default for RenderSettings {
     fn default() -> Self {
         Self {
+            draw_grid: true,
             draw_solid_surface: true,
+            use_texture: true,
             draw_velocities: false,
             draw_forces: false,
             vel_scale: 1e4,

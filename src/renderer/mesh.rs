@@ -60,16 +60,17 @@ impl<T: VertexLike> Mesh<T> {
         let mut result: HashMap<(u32, u32), u32> = HashMap::new();
 
         for lat_index in 0..n_parallels + 1 {
-            for lon_index in 0..n_meridians {
+            for lon_index in 0..n_meridians + 1 {
                 let _ = result.entry((lat_index, lon_index)).or_insert_with(|| {
                     let lat = (90.0 - 180.0 / (n_parallels as f64) * lat_index as f64).to_radians();
-                    let lon = (360.0 / (n_meridians as f64) * lon_index as f64).to_radians();
+                    let lon =
+                        (360.0 / (n_meridians as f64) * lon_index as f64 - 180.0).to_radians();
                     let x = lat.cos() * lon.cos();
                     let y = lat.cos() * lon.sin();
                     let z = lat.sin();
 
-                    let u = lat_index as f32 / n_parallels as f32;
-                    let v = lon_index as f32 / n_meridians as f32;
+                    let u = lon_index as f32 / n_meridians as f32;
+                    let v = (n_parallels - lat_index) as f32 / n_parallels as f32;
 
                     vertices.push(T::from_position_and_tex(y as f32, z as f32, x as f32, u, v));
                     vertices.len() as u32 - 1
@@ -84,13 +85,10 @@ impl<T: VertexLike> Mesh<T> {
         // construct the fans around the north and south pole
         let mut fan_index_n = vec![result[&(0, 0)]];
         let mut fan_index_s = vec![result[&(n_parallels, 0)]];
-        for lon_index in 0..n_meridians {
+        for lon_index in 0..n_meridians + 1 {
             fan_index_n.push(result[&(1, lon_index)]);
             fan_index_s.push(result[&(n_parallels - 1, lon_index)]);
         }
-        // close the fan
-        fan_index_n.push(result[&(1, 0)]);
-        fan_index_s.push(result[&(n_parallels - 1, 0)]);
         indices.push(
             IndexBuffer::new(display, index::PrimitiveType::TriangleFan, &fan_index_n).unwrap(),
         );
@@ -101,13 +99,10 @@ impl<T: VertexLike> Mesh<T> {
         // parallel strips
         for lat_index in 1..n_parallels - 1 {
             let mut parallel_index = vec![];
-            for lon_index in 0..n_meridians {
+            for lon_index in 0..n_meridians + 1 {
                 parallel_index.push(result[&(lat_index, lon_index)]);
                 parallel_index.push(result[&(lat_index + 1, lon_index)]);
             }
-            // close the strip
-            parallel_index.push(result[&(lat_index, 0)]);
-            parallel_index.push(result[&(lat_index + 1, 0)]);
             indices.push(
                 IndexBuffer::new(
                     display,

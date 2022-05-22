@@ -1,6 +1,8 @@
 mod cubemap;
 mod mesh;
 
+use std::io::Cursor;
+
 use glium::{
     implement_vertex, index, uniform, uniforms::Uniforms, Display, DrawParameters, Frame, Program,
     Surface, VertexBuffer,
@@ -84,6 +86,8 @@ implement_vertex!(TexturedVertex, position, tex_coords);
 
 pub struct Renderer {
     program: Program,
+    textured_program: Program,
+    tex_earth: glium::Texture2d,
     earth_solid_sphere: Mesh<TexturedVertex>,
     earth_grid: Mesh<Vertex>,
     object_solid_sphere: Mesh<Vertex>,
@@ -122,9 +126,28 @@ fn galactic_matrix() -> Matrix4<f32> {
 
 impl Renderer {
     pub fn new(display: &Display) -> Self {
+        let image = image::load(
+            Cursor::new(&include_bytes!("media/earth.jpg")[..]),
+            image::ImageFormat::Jpeg,
+        )
+        .unwrap()
+        .to_rgba8();
+        let image_dimensions = image.dimensions();
+        let image =
+            glium::texture::RawImage2d::from_raw_rgba_reversed(&image.into_raw(), image_dimensions);
+        let tex_earth = glium::Texture2d::new(display, image).unwrap();
+
         Renderer {
             program: Program::from_source(display, VERTEX_SHADER_SRC, FRAGMENT_SHADER_SRC, None)
                 .unwrap(),
+            textured_program: Program::from_source(
+                display,
+                TEXTURED_VERTEX_SHADER_SRC,
+                TEXTURED_FRAGMENT_SHADER_SRC,
+                None,
+            )
+            .unwrap(),
+            tex_earth,
             earth_solid_sphere: Mesh::solid_sphere(display, 120, 240),
             earth_grid: Mesh::ellipsoid(display),
             arrow: Mesh::arrow(display),
@@ -187,22 +210,39 @@ impl Renderer {
                 (R_POL * 0.995) as f32,
                 (R_EQU * 0.995) as f32,
             ));
-            let uniforms = uniform! {
-                matrix: *(matrix * earth_rotation * scaling).as_ref(),
-                color: [0.1_f32, 0.25, 0.1],
-            };
 
-            self.earth_solid_sphere
-                .draw(target, &self.program, &uniforms, &draw_parameters);
-        }
+            if state.render_settings.use_texture {
+                let uniforms = uniform! {
+                    matrix: *(matrix * earth_rotation * scaling).as_ref(),
+                    tex: &self.tex_earth,
+                };
 
-        let uniforms = uniform! {
-            matrix: *(matrix * earth_rotation).as_ref(),
-            color: [0.4_f32, 1.0, 0.4],
+                self.earth_solid_sphere.draw(
+                    target,
+                    &self.textured_program,
+                    &uniforms,
+                    &draw_parameters,
+                );
+            } else {
+                let uniforms = uniform! {
+                    matrix: *(matrix * earth_rotation * scaling).as_ref(),
+                    color: [0.1_f32, 0.25, 0.1],
+                };
+
+                self.earth_solid_sphere
+                    .draw(target, &self.program, &uniforms, &draw_parameters);
+            }
         };
 
-        self.earth_grid
-            .draw(target, &self.program, &uniforms, &draw_parameters);
+        if state.render_settings.draw_grid {
+            let uniforms = uniform! {
+                matrix: *(matrix * earth_rotation).as_ref(),
+                color: [0.4_f32, 1.0, 0.4],
+            };
+
+            self.earth_grid
+                .draw(target, &self.program, &uniforms, &draw_parameters);
+        }
 
         let obj_ang = 0.0;
         let obj_rotation = Matrix4::new_rotation(Vector3::new(0.0, obj_ang as f32, 0.0));

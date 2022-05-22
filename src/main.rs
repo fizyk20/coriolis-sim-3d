@@ -86,10 +86,12 @@ fn main() {
 
                     ui.separator();
 
+                    ui.checkbox(&mut state.render_settings.draw_grid, "Draw grid");
                     ui.checkbox(
                         &mut state.render_settings.draw_solid_surface,
                         "Draw solid surface",
                     );
+                    ui.checkbox(&mut state.render_settings.use_texture, "Use the texture");
                     ui.checkbox(
                         &mut state.render_settings.draw_velocities,
                         "Draw velocities",
