@@ -10,6 +10,7 @@ pub enum ObjectKindTag {
     Cyclone,
     Anticyclone,
     Foucault,
+    Plane,
 }
 
 impl fmt::Display for ObjectKindTag {
@@ -19,6 +20,7 @@ impl fmt::Display for ObjectKindTag {
             ObjectKindTag::Cyclone => write!(f, "Cyclone"),
             ObjectKindTag::Anticyclone => write!(f, "Anticyclone"),
             ObjectKindTag::Foucault => write!(f, "Foucault Pendulum"),
+            ObjectKindTag::Plane => write!(f, "Plane"),
         }
     }
 }
@@ -42,6 +44,10 @@ pub enum ObjectKind {
         vel: String,
     },
     Foucault {
+        vel: String,
+        azim: String,
+    },
+    Plane {
         vel: String,
         azim: String,
     },
@@ -80,12 +86,20 @@ impl ObjectKind {
         }
     }
 
+    pub fn default_plane() -> Self {
+        Self::Plane {
+            vel: "250".to_string(),
+            azim: "0".to_string(),
+        }
+    }
+
     pub fn as_tag(&self) -> ObjectKindTag {
         match self {
             ObjectKind::Free { .. } => ObjectKindTag::Free,
             ObjectKind::Cyclone { .. } => ObjectKindTag::Cyclone,
             ObjectKind::Anticyclone { .. } => ObjectKindTag::Anticyclone,
             ObjectKind::Foucault { .. } => ObjectKindTag::Foucault,
+            ObjectKind::Plane { .. } => ObjectKindTag::Plane,
         }
     }
 }
@@ -192,6 +206,17 @@ impl ObjectDescription {
                     create_object(self.lat_f(), self.lon_f(), self.elev_f(), vel_e, vel_n, 0.0)
                         .with_color(self.color[0], self.color[1], self.color[2])
                         .as_pendulum(2e-6),
+                ]
+            }
+            ObjectKind::Plane { vel, azim } => {
+                let azim = azim.parse().unwrap_or(0.0f64).to_radians();
+                let vel = vel.parse().unwrap_or(0.0);
+                let vel_e = vel * azim.sin();
+                let vel_n = vel * azim.cos();
+                vec![
+                    create_object(self.lat_f(), self.lon_f(), self.elev_f(), vel_e, vel_n, 0.0)
+                        .with_color(self.color[0], self.color[1], self.color[2])
+                        .counteract_coriolis(true),
                 ]
             }
         }

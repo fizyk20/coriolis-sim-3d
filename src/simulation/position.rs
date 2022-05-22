@@ -40,6 +40,15 @@ impl Position {
         Position { t, pos, omega }
     }
 
+    pub fn dir_to_omega(&self, vec: Vector3<f64>, omega: f64) -> Vector3<f64> {
+        let w = omega - self.omega;
+        let wt = w * self.t;
+        let s = wt.sin();
+        let c = wt.cos();
+
+        Vector3::new(vec.x * c - vec.z * s, vec.y, vec.x * s + vec.z * c)
+    }
+
     pub fn grav(&self, gm: f64) -> Vector3<f64> {
         let r = self.pos.norm();
         -gm / r / r / r * self.pos

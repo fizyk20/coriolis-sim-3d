@@ -92,7 +92,7 @@ pub fn display_object(obj: &mut ObjectDescription, ui: &mut Ui) -> bool {
                 ui.label("m/s");
             });
         }
-        ObjectKind::Foucault { azim, vel } => {
+        ObjectKind::Foucault { azim, vel } | ObjectKind::Plane { azim, vel } => {
             ui.horizontal(|ui| {
                 ui.label("Starting azimuth:");
                 ui.text_edit_singleline(azim);

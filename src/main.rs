@@ -136,8 +136,11 @@ fn main() {
                     ui.indent(0u64, |ui| {
                         for (i, obj) in state.objects.iter().enumerate() {
                             ui.collapsing(format!("Object {}", i), |ui| {
-                                let vel = obj.vel().to_omega(obj.pos(), state.omega * OMEGA);
-                                ui.label(format!("Vel = {:5.1} m/s", vel.vel().norm()));
+                                let status =
+                                    obj.status(state.omega * OMEGA, &state.render_settings);
+                                for text in status {
+                                    ui.label(text);
+                                }
                             });
                         }
                     });
@@ -177,6 +180,11 @@ fn main() {
                                         ObjectKindTag::Foucault,
                                         format!("{}", ObjectKindTag::Foucault),
                                     );
+                                    ui.selectable_value(
+                                        &mut new_state_def.selected_kind,
+                                        ObjectKindTag::Plane,
+                                        format!("{}", ObjectKindTag::Plane),
+                                    );
                                 });
                             if ui.button("Add").clicked() {
                                 let new_object_kind = match new_state_def.selected_kind {
@@ -184,6 +192,7 @@ fn main() {
                                     ObjectKindTag::Cyclone => ObjectKind::default_cyclone(),
                                     ObjectKindTag::Anticyclone => ObjectKind::default_anticyclone(),
                                     ObjectKindTag::Foucault => ObjectKind::default_foucault(),
+                                    ObjectKindTag::Plane => ObjectKind::default_plane(),
                                 };
                                 let new_object = ObjectDescription {
                                     kind: new_object_kind,

@@ -42,6 +42,48 @@ pub fn lat_lon_elev_to_vec3(lat: f64, lon: f64, elev: f64) -> Vector3<f64> {
     Vector3::new(x * lon.sin(), y, x * lon.cos())
 }
 
+pub fn pos_to_lat_lon_elev(pos: Vector3<f64>) -> (f64, f64, f64) {
+    let lon = pos.x.atan2(pos.z).to_degrees();
+    let r = pos.norm();
+    let x = (pos.x * pos.x + pos.z * pos.z).sqrt();
+    let y = pos.y;
+
+    if x < 1e-10 {
+        let lat = if y > 0.0 { 90.0 } else { -90.0 };
+        return (lat, lon, r - R_POL);
+    }
+
+    // initial guess
+    let mut lat_r = (y / r).asin();
+
+    let f = |l: f64| {
+        x / R_EQU * l.sin()
+            - y / R_EQU * l.cos()
+            - ECC2 * l.sin() * l.cos() / (1.0 - ECC2 * l.sin() * l.sin()).sqrt()
+    };
+    let df = |l: f64| {
+        let lc = l.cos();
+        let ls = l.sin();
+        let coeff = (1.0 - ECC2 * ls * ls).sqrt();
+        x / R_EQU * lc + y / R_EQU * ls
+            - ECC2 * (ECC2 * ls * ls * ls * ls - ls * ls + lc * lc) / coeff / coeff / coeff
+    };
+
+    let mut n_iter = 0;
+    loop {
+        let diff = f(lat_r) / df(lat_r);
+        if diff.abs() < 1e-10 || n_iter > 5 {
+            break;
+        }
+        lat_r -= diff;
+        n_iter += 1;
+    }
+
+    let h = x / lat_r.cos() - nphi(lat_r);
+
+    (lat_r.to_degrees(), lon, h)
+}
+
 pub fn earth_radius(lat_r_gc: f64) -> f64 {
     let x = lat_r_gc.cos() / R_EQU;
     let y = lat_r_gc.sin() / R_POL;
