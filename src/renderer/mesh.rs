@@ -5,16 +5,51 @@ use glium::{
     VertexBuffer,
 };
 
-use super::Vertex;
+use super::{TexturedVertex, Vertex};
 use crate::simulation::lat_lon_elev_to_vec3;
 
-pub struct Mesh {
-    vertices: VertexBuffer<Vertex>,
+pub trait VertexLike: glium::Vertex {
+    fn from_position(x: f32, y: f32, z: f32) -> Self;
+    fn from_position_and_tex(x: f32, y: f32, z: f32, u: f32, v: f32) -> Self;
+}
+
+impl VertexLike for Vertex {
+    fn from_position(x: f32, y: f32, z: f32) -> Self {
+        Vertex {
+            position: [x, y, z],
+        }
+    }
+
+    fn from_position_and_tex(x: f32, y: f32, z: f32, _u: f32, _v: f32) -> Self {
+        Vertex {
+            position: [x, y, z],
+        }
+    }
+}
+
+impl VertexLike for TexturedVertex {
+    fn from_position(x: f32, y: f32, z: f32) -> Self {
+        TexturedVertex {
+            position: [x, y, z],
+            tex_coords: [0.0, 0.0],
+        }
+    }
+
+    fn from_position_and_tex(x: f32, y: f32, z: f32, u: f32, v: f32) -> Self {
+        TexturedVertex {
+            position: [x, y, z],
+            tex_coords: [u, v],
+        }
+    }
+}
+
+pub struct Mesh<T: VertexLike> {
+    vertices: VertexBuffer<T>,
     indices: Vec<IndexBuffer<u32>>,
 }
 
-impl Mesh {
-    pub fn solid_sphere(display: &Display, n_parallels: u32, n_meridians: u32) -> Mesh {
+impl<T: VertexLike> Mesh<T> {
+    pub fn solid_sphere(display: &Display, n_parallels: u32, n_meridians: u32) -> Mesh<T> {
         let mut vertices = vec![];
         let mut indices = vec![];
 
@@ -32,9 +67,11 @@ impl Mesh {
                     let x = lat.cos() * lon.cos();
                     let y = lat.cos() * lon.sin();
                     let z = lat.sin();
-                    vertices.push(Vertex {
-                        position: [y as f32, z as f32, x as f32],
-                    });
+
+                    let u = lat_index as f32 / n_parallels as f32;
+                    let v = lon_index as f32 / n_meridians as f32;
+
+                    vertices.push(T::from_position_and_tex(y as f32, z as f32, x as f32, u, v));
                     vertices.len() as u32 - 1
                 });
                 // for poles, only insert lon_index = 0
@@ -86,7 +123,7 @@ impl Mesh {
         Mesh { vertices, indices }
     }
 
-    pub fn ellipsoid(display: &Display) -> Mesh {
+    pub fn ellipsoid(display: &Display) -> Mesh<T> {
         let n_meridians = 24;
         let n_parallels = 12;
         let n_subdivisions = 10;
@@ -114,9 +151,7 @@ impl Mesh {
                         90.0 - 180.0 / ((n_parallels * n_subdivisions) as f64) * lat_index as f64;
                     let lon = 360.0 / ((n_meridians * n_subdivisions) as f64) * lon_index as f64;
                     let pos = lat_lon_elev_to_vec3(lat, lon, 0.0);
-                    vertices.push(Vertex {
-                        position: [pos.x as f32, pos.y as f32, pos.z as f32],
-                    });
+                    vertices.push(T::from_position(pos.x as f32, pos.y as f32, pos.z as f32));
                     vertices.len() as u32 - 1
                 });
                 // for poles, only insert lon_index = 0
@@ -148,9 +183,7 @@ impl Mesh {
                         90.0 - 180.0 / ((n_parallels * n_subdivisions) as f64) * lat_index as f64;
                     let lon = 360.0 / ((n_meridians * n_subdivisions) as f64) * lon_index as f64;
                     let pos = lat_lon_elev_to_vec3(lat, lon, 0.0);
-                    vertices.push(Vertex {
-                        position: [pos.x as f32, pos.y as f32, pos.z as f32],
-                    });
+                    vertices.push(T::from_position(pos.x as f32, pos.y as f32, pos.z as f32));
                     vertices.len() as u32 - 1
                 });
                 meridian_indices.push(*entry);
@@ -166,48 +199,44 @@ impl Mesh {
         Mesh { vertices, indices }
     }
 
-    pub fn arrow(display: &Display) -> Mesh {
+    pub fn arrow(display: &Display) -> Mesh<T> {
         let n_divisions: u32 = 24;
 
         let head_len = 0.25f32;
         let radius = head_len / 6.0;
 
         let mut vertices = vec![
-            Vertex {
-                position: [0.0, 0.0, 1.0], // tip
-            },
-            Vertex {
-                position: [0.0, 0.0, 1.0 - head_len], // middle of the base of the cone
-            },
+            T::from_position(0.0, 0.0, 1.0),            // tip
+            T::from_position(0.0, 0.0, 1.0 - head_len), // middle of the base of the cone
         ];
 
         // vertices for the head
         for i in 0..n_divisions {
             let ang = (i as f32 * 360.0 / n_divisions as f32).to_radians();
-            vertices.push(Vertex {
-                position: [
-                    3.0 * radius * ang.cos(),
-                    3.0 * radius * ang.sin(),
-                    1.0 - head_len,
-                ],
-            });
+            vertices.push(T::from_position(
+                3.0 * radius * ang.cos(),
+                3.0 * radius * ang.sin(),
+                1.0 - head_len,
+            ));
         }
 
         // vertices for the shaft
         for i in 0..n_divisions {
             let ang = (i as f32 * 360.0 / n_divisions as f32).to_radians();
-            vertices.push(Vertex {
-                position: [radius * ang.cos(), radius * ang.sin(), 1.0 - head_len],
-            });
-            vertices.push(Vertex {
-                position: [radius * ang.cos(), radius * ang.sin(), 0.0],
-            });
+            vertices.push(T::from_position(
+                radius * ang.cos(),
+                radius * ang.sin(),
+                1.0 - head_len,
+            ));
+            vertices.push(T::from_position(
+                radius * ang.cos(),
+                radius * ang.sin(),
+                0.0,
+            ));
         }
 
         // middle of the end of the shaft
-        vertices.push(Vertex {
-            position: [0.0, 0.0, 0.0],
-        });
+        vertices.push(T::from_position(0.0, 0.0, 0.0));
 
         let vertices = VertexBuffer::new(display, &vertices).unwrap();
 

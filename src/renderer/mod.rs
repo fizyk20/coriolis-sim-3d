@@ -40,19 +40,54 @@ const FRAGMENT_SHADER_SRC: &'static str = r#"
     }
 "#;
 
+const TEXTURED_VERTEX_SHADER_SRC: &'static str = r#"
+    #version 140
+
+    in vec3 position;
+    in vec2 tex_coords;
+
+    uniform mat4 matrix;
+    out vec2 v_tex_coords;
+
+    void main() {
+        gl_Position = matrix * vec4(position, 1.0);
+        v_tex_coords = tex_coords;
+    }
+"#;
+
+const TEXTURED_FRAGMENT_SHADER_SRC: &'static str = r#"
+    #version 140
+
+    in vec2 v_tex_coords;
+    out vec4 color;
+
+    uniform sampler2D tex;
+
+    void main() {
+        color = texture(tex, v_tex_coords);
+    }
+"#;
+
 #[derive(Debug, Clone, Copy)]
 pub struct Vertex {
     pub position: [f32; 3],
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct TexturedVertex {
+    pub position: [f32; 3],
+    pub tex_coords: [f32; 2],
+}
+
 implement_vertex!(Vertex, position);
+implement_vertex!(TexturedVertex, position, tex_coords);
 
 pub struct Renderer {
     program: Program,
-    earth_solid_sphere: Mesh,
-    earth_grid: Mesh,
-    object_solid_sphere: Mesh,
-    arrow: Mesh,
+    earth_solid_sphere: Mesh<TexturedVertex>,
+    earth_grid: Mesh<Vertex>,
+    object_solid_sphere: Mesh<Vertex>,
+    arrow: Mesh<Vertex>,
     cubemap: Cubemap,
 }
 
