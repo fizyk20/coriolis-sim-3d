@@ -7,109 +7,8 @@ use numeric_algs::{
     State,
 };
 
-use super::{earth_radius, lat_lon_elev_to_vec3, r_curv, surface_normal, GM, OMEGA};
+use super::{earth_radius, r_curv, surface_normal, Position, Velocity, GM, OMEGA};
 use crate::{renderer::Painter, state::RenderSettings};
-
-#[derive(Debug, Clone, Copy)]
-pub struct Position {
-    pub t: f64,
-    pub pos: Vector3<f64>,
-    // angular velocity of the frame of reference
-    pub omega: f64,
-}
-
-impl Position {
-    pub fn from_lat_lon_elev(lat: f64, lon: f64, elev: f64) -> Self {
-        let pos = lat_lon_elev_to_vec3(lat, lon, elev);
-        Self {
-            t: 0.0,
-            pos,
-            omega: OMEGA,
-        }
-    }
-
-    pub fn with_t(self, t: f64) -> Self {
-        Position { t, ..self }
-    }
-
-    pub fn to_omega(self, omega: f64) -> Self {
-        if self.omega == omega {
-            return self;
-        }
-        let Position {
-            t,
-            pos,
-            omega: omega_old,
-        } = self;
-        let wt = (omega_old - omega) * t;
-        let s = wt.sin();
-        let c = wt.cos();
-        let pos = Vector3::new(pos.x * c + pos.z * s, pos.y, -pos.x * s + pos.z * c);
-        Position { t, pos, omega }
-    }
-
-    fn grav(&self, gm: f64) -> Vector3<f64> {
-        let r = self.pos.norm();
-        -gm / r / r / r * self.pos
-    }
-
-    fn centrifugal(&self) -> Vector3<f64> {
-        let r_xz = Vector3::new(self.pos.x, 0.0, self.pos.z);
-        r_xz * self.omega * self.omega
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Velocity {
-    pub vel: Vector3<f64>,
-    // angular velocity of the frame of reference
-    omega: f64,
-}
-
-impl Velocity {
-    pub fn from_east_north_up(pos: Position, e: f64, n: f64, u: f64) -> Self {
-        let old_omega = pos.omega;
-        let pos = pos.to_omega(OMEGA);
-        let eff_grav = pos.grav(GM) + pos.centrifugal();
-        let up = -eff_grav / eff_grav.norm();
-        let lon = pos.pos.x.atan2(pos.pos.z);
-        let east = Vector3::new(lon.cos(), 0.0, -lon.sin());
-        let north = up.cross(&east);
-
-        let vel = Self {
-            vel: e * east + n * north + u * up,
-            omega: OMEGA,
-        };
-
-        vel.to_omega(pos, old_omega)
-    }
-
-    pub fn to_omega(self, pos: Position, omega: f64) -> Self {
-        if self.omega == omega {
-            return self;
-        }
-        let Velocity {
-            vel,
-            omega: omega_old,
-        } = self;
-        let Position { t, pos, .. } = pos.to_omega(omega_old);
-        let dw = omega - omega_old;
-        let wt = dw * t;
-        let s = wt.sin();
-        let c = wt.cos();
-
-        let z2 = vel.z + pos.x * dw;
-        let x2 = vel.x - pos.z * dw;
-        let vel = Vector3::new(x2 * c - z2 * s, vel.y, x2 * s + z2 * c);
-
-        Velocity { vel, omega }
-    }
-
-    fn coriolis(&self) -> Vector3<f64> {
-        let omega_v = Vector3::new(0.0, self.omega, 0.0);
-        -2.0 * omega_v.cross(&self.vel)
-    }
-}
 
 const MAX_PATH_LEN: usize = 50000;
 
@@ -121,8 +20,8 @@ enum ObjectState {
 
 #[derive(Clone)]
 pub struct Object {
-    pub pos: Position,
-    pub vel: Velocity,
+    pos: Position,
+    vel: Velocity,
     color: (f32, f32, f32),
     radius: f32,
     path: VecDeque<(Position, Velocity)>,
@@ -178,7 +77,7 @@ impl Object {
     pub fn as_pendulum(self, coeff: f64) -> Self {
         let pos0 = self.pos;
         let boxed_closure: Box<dyn Fn(Position) -> Vector3<f64>> =
-            Box::new(move |pos: Position| coeff * (pos0.to_omega(pos.omega).pos - pos.pos));
+            Box::new(move |pos: Position| coeff * (pos0.to_omega(pos.omega()).pos() - pos.pos()));
         let attractor = Rc::new(boxed_closure);
         Self {
             attractor: Some(attractor),
@@ -194,21 +93,29 @@ impl Object {
     }
 
     pub fn time(&self) -> f64 {
-        self.pos.t
+        self.pos.t()
+    }
+
+    pub fn pos(&self) -> Position {
+        self.pos
+    }
+
+    pub fn vel(&self) -> Velocity {
+        self.vel
     }
 
     fn derivative_inflight(&self) -> VectorN<f64, U7> {
-        let vel = self.vel.to_omega(self.pos, self.pos.omega);
+        let vel = self.vel.to_omega(self.pos, self.pos.omega());
         let acc = self.pos.grav(self.gm) + self.pos.centrifugal() + vel.coriolis();
-        let vel = vel.vel;
+        let vel = vel.vel();
 
         VectorN::<f64, U7>::from_column_slice(&[vel.x, vel.y, vel.z, acc.x, acc.y, acc.z, 1.0])
     }
 
     fn friction(&self) -> Vector3<f64> {
-        let o = OMEGA - self.pos.omega;
-        let vel = self.vel.to_omega(self.pos, self.pos.omega).vel;
-        let surf_vel = Vector3::new(o * self.pos.pos.z, 0.0, -o * self.pos.pos.x);
+        let o = OMEGA - self.pos.omega();
+        let vel = self.vel.to_omega(self.pos, self.pos.omega()).vel();
+        let surf_vel = Vector3::new(o * self.pos.pos().z, 0.0, -o * self.pos.pos().x);
         self.friction * (surf_vel - vel)
     }
 
@@ -221,17 +128,17 @@ impl Object {
     }
 
     fn derivative_onsurface(&self) -> VectorN<f64, U7> {
-        let vel = self.vel.to_omega(self.pos, self.pos.omega);
+        let vel = self.vel.to_omega(self.pos, self.pos.omega());
         // gravity, centrifugal and reaction from the ground should yield a net force equal to the
         // centripetal force according to the local radius of curvature of the surface
         let mut acc = vel.coriolis() + self.friction() + self.attraction_force();
-        let vel = vel.vel;
+        let vel = vel.vel();
 
         // make sure that the total vertical acceleration makes the object conform to the curvature
         // of the surface
-        let up = surface_normal(&self.pos.pos);
+        let up = surface_normal(&self.pos.pos());
         let v = vel.norm();
-        let r = r_curv(&self.pos.pos);
+        let r = r_curv(&self.pos.pos());
         let acc_up = acc.dot(&up);
         acc += (-v * v / r - acc_up) * up;
 
@@ -257,21 +164,24 @@ impl Object {
         integrator.propagate_in_place(self, Self::derivative, StepSize::Step(dt));
 
         let pos = self.pos.to_omega(OMEGA);
-        let r = pos.pos.norm();
-        let lat_r_gc = (pos.pos.y / r).asin();
+        let r = pos.pos().norm();
+        let lat_r_gc = (pos.pos().y / r).asin();
         let earth_r = earth_radius(lat_r_gc);
 
         if r < earth_r {
             self.state = ObjectState::OnSurface;
-            self.pos.pos *= earth_r / r;
-            self.vel.vel *= r / earth_r;
+
+            let mut vel = self.vel.to_omega(self.pos, 0.0);
+            self.pos.mul(earth_r / r);
+            vel.mul(r / earth_r);
+            self.vel = vel.to_omega(self.pos, self.pos.omega());
             // cancel the vertical component of the velocity if negative
-            let normal = surface_normal(&pos.pos);
+            let normal = surface_normal(&pos.pos());
             let mut vel = self.vel.to_omega(pos, OMEGA);
-            let v_up = vel.vel.dot(&normal);
+            let v_up = vel.vel().dot(&normal);
             if v_up < 0.0 {
-                vel.vel -= v_up * normal;
-                self.vel = vel.to_omega(self.pos, self.vel.omega);
+                vel.increase(-v_up * normal);
+                self.vel = vel.to_omega(self.pos, self.vel.omega());
             }
         }
     }
@@ -289,7 +199,7 @@ impl Object {
             .copied()
             .chain(iter::once((self.pos, self.vel)))
             .enumerate()
-            .take_while(|(i, pos)| *i == 0 || pos.0.t < render_settings.max_t)
+            .take_while(|(i, pos)| *i == 0 || pos.0.t() < render_settings.max_t)
             .map(|(_, pos)| pos)
             .collect();
 
@@ -297,9 +207,9 @@ impl Object {
         let vel = positions.last().unwrap().1.to_omega(pos, omega);
 
         let matrix_trans = matrix.prepend_translation(&Vector3::new(
-            pos.pos.x as f32,
-            pos.pos.y as f32,
-            pos.pos.z as f32,
+            pos.pos().x as f32,
+            pos.pos().y as f32,
+            pos.pos().z as f32,
         ));
         let uniforms = uniform! {
             matrix: *(matrix_trans.prepend_scaling(self.radius)).as_ref(),
@@ -319,14 +229,14 @@ impl Object {
                 .iter()
                 .map(|pos| {
                     let pos = pos.0.to_omega(omega);
-                    Vector3::new(pos.pos.x as f32, pos.pos.y as f32, pos.pos.z as f32)
+                    Vector3::new(pos.pos().x as f32, pos.pos().y as f32, pos.pos().z as f32)
                 })
                 .collect::<Vec<_>>(),
         );
 
         if render_settings.draw_velocities {
             // draw the velocity direction
-            let vel = vel.vel * render_settings.vel_scale;
+            let vel = vel.vel() * render_settings.vel_scale;
 
             self.draw_vector(vel, painter, &matrix_trans, self.color());
         }
@@ -376,8 +286,8 @@ impl State for Object {
         let shift = dir * amount;
         let vel = Vector3::from_column_slice(&shift.as_ref()[0..3]);
         let acc = Vector3::from_column_slice(&shift.as_ref()[3..6]);
-        self.pos.pos += vel;
-        self.vel.vel += acc;
-        self.pos.t += shift[6];
+        self.pos.increase(vel);
+        self.vel.increase(acc);
+        self.pos.increase_time(shift[6]);
     }
 }

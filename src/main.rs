@@ -136,8 +136,8 @@ fn main() {
                     ui.indent(0u64, |ui| {
                         for (i, obj) in state.objects.iter().enumerate() {
                             ui.collapsing(format!("Object {}", i), |ui| {
-                                let vel = obj.vel.to_omega(obj.pos, state.omega * OMEGA);
-                                ui.label(format!("Vel = {:5.1} m/s", vel.vel.norm()));
+                                let vel = obj.vel().to_omega(obj.pos(), state.omega * OMEGA);
+                                ui.label(format!("Vel = {:5.1} m/s", vel.vel().norm()));
                             });
                         }
                     });

@@ -72,7 +72,7 @@ pub fn cyclone(
                 .with_color(color.0, color.1, color.2)
                 .with_radius(100e3)
                 .with_attractor(Box::new(move |pos| {
-                    let pos_diff = center_pos.to_omega(pos.omega).pos - pos.pos;
+                    let pos_diff = center_pos.to_omega(pos.omega()).pos() - pos.pos();
                     let pos_norm = pos_diff.norm();
                     pos_diff / pos_norm / pos_norm * attractor_coeff
                 }))

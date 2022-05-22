@@ -1,8 +1,12 @@
 mod object;
+mod position;
+mod velocity;
 
 use nalgebra::Vector3;
 
-pub use object::{Object, Position, Velocity};
+pub use object::Object;
+pub use position::Position;
+pub use velocity::Velocity;
 
 /// Earth's angular speed in radians per second
 pub const OMEGA: f64 = 7.29212351699e-5;
