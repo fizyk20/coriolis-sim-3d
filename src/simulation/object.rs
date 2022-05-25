@@ -8,7 +8,8 @@ use numeric_algs::{
 };
 
 use super::{
-    earth_radius, pos_to_lat_lon_elev, r_curv, surface_normal, Position, Velocity, GM, OMEGA,
+    air_density, earth_radius, pos_to_lat_lon_elev, r_curv, surface_normal, Position, Velocity, GM,
+    OMEGA,
 };
 use crate::{renderer::Painter, state::RenderSettings};
 
@@ -43,6 +44,16 @@ impl SimState {
         let vel = self.vel.to_omega(self.pos, self.pos.omega()).vel();
         let surf_vel = Vector3::new(o * self.pos.pos().z, 0.0, -o * self.pos.pos().x);
         friction * (surf_vel - vel)
+    }
+
+    fn drag(&self, drag_coeff: f64) -> Vector3<f64> {
+        let o = OMEGA - self.pos.omega();
+        let (_, _, elev) = pos_to_lat_lon_elev(self.pos.to_omega(OMEGA).pos());
+        let density = air_density(elev);
+        let vel = self.vel.to_omega(self.pos, self.pos.omega()).vel();
+        let surf_vel = Vector3::new(o * self.pos.pos().z, 0.0, -o * self.pos.pos().x);
+        let vel_diff = surf_vel - vel;
+        drag_coeff * density * vel_diff.norm() * vel_diff
     }
 }
 
@@ -140,8 +151,9 @@ impl Object {
     }
 
     fn derivative_inflight(&self) -> VectorN<f64, U7> {
+        let drag = self.sim_state.drag(self.drag_coeff);
         let vel = self.vel().to_omega(self.pos(), self.pos().omega());
-        let acc = self.pos().grav(self.gm) + self.pos().centrifugal() + vel.coriolis();
+        let acc = self.pos().grav(self.gm) + self.pos().centrifugal() + vel.coriolis() + drag;
         let vel = vel.vel();
 
         VectorN::<f64, U7>::from_column_slice(&[vel.x, vel.y, vel.z, acc.x, acc.y, acc.z, 1.0])
@@ -166,6 +178,7 @@ impl Object {
         // centripetal force according to the local radius of curvature of the surface
         let mut acc = vel.coriolis()
             + self.sim_state.friction(self.friction)
+            + self.sim_state.drag(self.drag_coeff)
             + self.attraction_force()
             + coriolis_counteraction;
         let vel = vel.vel();

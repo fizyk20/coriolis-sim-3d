@@ -33,6 +33,7 @@ pub enum ObjectKind {
         vel_u: String,
         gravity: String,
         friction: String,
+        drag: String,
     },
     Cyclone {
         n_particles: String,
@@ -61,6 +62,7 @@ impl ObjectKind {
             vel_u: "0".to_string(),
             gravity: "1".to_string(),
             friction: "0".to_string(),
+            drag: "0".to_string(),
         }
     }
 
@@ -146,12 +148,14 @@ impl ObjectDescription {
                 vel_u,
                 gravity,
                 friction,
+                drag,
             } => {
                 let vel_e = vel_e.parse().unwrap_or(0.0);
                 let vel_n = vel_n.parse().unwrap_or(0.0);
                 let vel_u = vel_u.parse().unwrap_or(0.0);
                 let gravity = gravity.parse().unwrap_or(1.0);
                 let friction = friction.parse().unwrap_or(0.0);
+                let drag = drag.parse().unwrap_or(0.0);
                 vec![create_object(
                     self.lat_f(),
                     self.lon_f(),
@@ -162,7 +166,8 @@ impl ObjectDescription {
                 )
                 .with_color(self.color[0], self.color[1], self.color[2])
                 .with_gm(GM * gravity)
-                .with_friction(friction)]
+                .with_friction(friction)
+                .with_drag(drag)]
             }
             ObjectKind::Cyclone {
                 n_particles,

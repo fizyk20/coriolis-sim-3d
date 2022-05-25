@@ -20,10 +20,6 @@ impl Position {
         }
     }
 
-    pub fn with_t(self, t: f64) -> Self {
-        Position { t, ..self }
-    }
-
     pub fn to_omega(self, omega: f64) -> Self {
         if self.omega == omega {
             return self;

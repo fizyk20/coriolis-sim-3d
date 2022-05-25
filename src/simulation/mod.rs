@@ -105,3 +105,7 @@ pub fn r_curv(pos: &Vector3<f64>) -> f64 {
     let coeff = (R_EQU * R_EQU + R_POL * R_POL - r2).sqrt();
     coeff * coeff * coeff / R_EQU / R_POL
 }
+
+pub fn air_density(elev: f64) -> f64 {
+    1.225 * (-0.000125 * elev).exp()
+}
