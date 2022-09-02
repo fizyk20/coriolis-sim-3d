@@ -10,7 +10,7 @@ egui = "0.18"
 egui_glium = "0.18"
 glium = "0.31"
 image = "0.24"
-nalgebra = "0.21"
+nalgebra = "0.27"
 numeric-algs = "0.5"
 
 [features]
