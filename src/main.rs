@@ -10,7 +10,7 @@ use renderer::Renderer;
 
 use crate::{
     simulation::OMEGA,
-    state::{ObjectDescription, ObjectKind, ObjectKindTag, State},
+    state::{ObjectDescription, ObjectKind, ObjectKindTag, State, StateTag},
 };
 
 use interface::display_object;

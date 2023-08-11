@@ -137,6 +137,7 @@ impl State {
         self.t = 0.0;
         self.ang = 0.0;
         self.omega = 1.0;
+        self.render_settings.max_t = 0.0;
 
         self.objects = vec![];
         for object_def in self.current_state_def.objects.iter() {

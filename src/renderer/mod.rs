@@ -7,11 +7,11 @@ use glium::{
     implement_vertex, index, uniform, uniforms::Uniforms, Display, DrawParameters, Frame, Program,
     Surface, VertexBuffer,
 };
-use nalgebra::{Matrix4, Vector3};
+use nalgebra::{Matrix4, Point3, Vector3};
 
 use crate::{
-    simulation::{OMEGA, R_EQU, R_POL},
-    State,
+    simulation::{surface_normal, OMEGA, R_EQU, R_POL},
+    State, StateTag,
 };
 use cubemap::Cubemap;
 pub use mesh::Mesh;
@@ -156,6 +156,60 @@ impl Renderer {
         }
     }
 
+    pub fn view_external(state: &State) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
+        let omega = OMEGA * state.omega;
+
+        let dist = state.camera_state.external.distance;
+        let lat = state.camera_state.external.lat;
+        let lon = state.camera_state.external.lon;
+
+        let camera_ang = state.ang - omega * state.t;
+
+        let view_rot = Matrix4::new_rotation(Vector3::new(lat as f32, 0.0, 0.0))
+            * Matrix4::new_rotation(Vector3::new(0.0, -lon - camera_ang as f32, 0.0));
+        let view_trans = Matrix4::new_translation(&Vector3::new(0.0, 0.0, -dist));
+        let camera_orient =
+            Matrix4::new_rotation(Vector3::new(0.0, state.camera_state.external.turn, 0.0))
+                * Matrix4::new_rotation(Vector3::new(state.camera_state.external.tilt, 0.0, 0.0));
+
+        (view_rot, view_trans, camera_orient)
+    }
+
+    pub fn view_following(
+        state: &State,
+        earth_rot: &Matrix4<f32>,
+    ) -> (Matrix4<f32>, Matrix4<f32>, Matrix4<f32>) {
+        let follow_obj = state.camera_state.following.obj;
+        if follow_obj >= state.objects.len() {
+            return Self::view_external(state);
+        }
+
+        let pos = state.objects[follow_obj].pos().to_omega(OMEGA);
+        let vel = state.objects[follow_obj].vel().to_omega(pos, OMEGA).vel();
+        let up = surface_normal(&pos.pos());
+        let front = (vel - vel.dot(&up) * up).normalize();
+
+        let pos = pos.pos();
+        let view_trans = earth_rot.transpose()
+            * Matrix4::new_translation(&Vector3::new(
+                -pos[0] as f32,
+                -pos[1] as f32,
+                -pos[2] as f32,
+            ))
+            * earth_rot;
+        let view_rot = Matrix4::identity();
+
+        let camera_orient = earth_rot.transpose()
+            * Matrix4::look_at_rh(
+                &Point3::new(0.0, 0.0, 0.0),
+                &Point3::new(front[0] as f32, front[1] as f32, front[2] as f32),
+                &Vector3::new(up[0] as f32, up[1] as f32, up[2] as f32),
+            )
+            * earth_rot;
+
+        (view_rot, view_trans, camera_orient)
+    }
+
     pub fn draw(&mut self, display: &Display, target: &mut Frame, state: &State) {
         target.clear_color(0.0, 0.0, 0.02, 1.0);
         target.clear_depth(1.0);
@@ -169,25 +223,17 @@ impl Renderer {
         // how much has the frame rotated with respect to the sky
         let skybox_ang = -omega * state.render_settings.max_t;
 
-        let dist = state.camera_state.external.distance;
-        let lat = state.camera_state.external.lat;
-        let lon = state.camera_state.external.lon;
-
-        let camera_ang = state.ang - omega * state.t;
-
-        let perspective = Matrix4::new_perspective(aspect, 45.0_f32.to_radians(), 1000.0, 1e9);
-        let view_rot = Matrix4::new_rotation(Vector3::new(lat as f32, 0.0, 0.0))
-            * Matrix4::new_rotation(Vector3::new(0.0, -lon - camera_ang as f32, 0.0));
-        let view_trans = Matrix4::new_translation(&Vector3::new(0.0, 0.0, -dist));
-        let camera_orient =
-            Matrix4::new_rotation(Vector3::new(0.0, state.camera_state.external.turn, 0.0))
-                * Matrix4::new_rotation(Vector3::new(state.camera_state.external.tilt, 0.0, 0.0));
-        let matrix = perspective * camera_orient * view_trans * view_rot;
-
         let earth_rotation = Matrix4::new_rotation(Vector3::new(0.0, earth_ang as f32, 0.0));
         let skybox_rotation = Matrix4::new_rotation(Vector3::new(0.0, skybox_ang as f32, 0.0));
 
         let galactic_pole_rot = galactic_matrix();
+
+        let perspective = Matrix4::new_perspective(aspect, 45.0_f32.to_radians(), 1000.0, 1e9);
+        let (view_rot, view_trans, camera_orient) = match state.camera_state.tag {
+            StateTag::External => Self::view_external(state),
+            StateTag::Following => Self::view_following(state, &earth_rotation),
+        };
+        let matrix = perspective * camera_orient * view_trans * view_rot;
 
         let draw_parameters = glium::DrawParameters {
             depth: glium::draw_parameters::Depth {
@@ -207,9 +253,9 @@ impl Renderer {
 
         if state.render_settings.draw_solid_surface {
             let scaling = Matrix4::new_nonuniform_scaling(&Vector3::new(
-                (R_EQU * 0.995) as f32,
-                (R_POL * 0.995) as f32,
-                (R_EQU * 0.995) as f32,
+                (R_EQU * 0.9999) as f32,
+                (R_POL * 0.9999) as f32,
+                (R_EQU * 0.9999) as f32,
             ));
 
             if state.render_settings.use_texture {
@@ -258,7 +304,12 @@ impl Renderer {
             },
         };
 
-        for obj in &state.objects {
+        for (index, obj) in state.objects.iter().enumerate() {
+            if index == state.camera_state.following.obj
+                && state.camera_state.tag == StateTag::Following
+            {
+                continue;
+            }
             obj.draw(
                 &mut painter,
                 omega,
