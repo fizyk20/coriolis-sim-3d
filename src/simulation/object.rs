@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, iter, rc::Rc};
 
 use glium::uniform;
-use nalgebra::{base::dimension::U7, Matrix4, Vector3, VectorN};
+use nalgebra::{Matrix4, SVector, Vector3};
 use numeric_algs::{
     integration::{Integrator, StepSize},
     State,
@@ -150,13 +150,13 @@ impl Object {
         self.sim_state.vel
     }
 
-    fn derivative_inflight(&self) -> VectorN<f64, U7> {
+    fn derivative_inflight(&self) -> SVector<f64, 7> {
         let drag = self.sim_state.drag(self.drag_coeff);
         let vel = self.vel().to_omega(self.pos(), self.pos().omega());
         let acc = self.pos().grav(self.gm) + self.pos().centrifugal() + vel.coriolis() + drag;
         let vel = vel.vel();
 
-        VectorN::<f64, U7>::from_column_slice(&[vel.x, vel.y, vel.z, acc.x, acc.y, acc.z, 1.0])
+        SVector::<f64, 7>::from_column_slice(&[vel.x, vel.y, vel.z, acc.x, acc.y, acc.z, 1.0])
     }
 
     fn attraction_force(&self) -> Vector3<f64> {
@@ -167,7 +167,7 @@ impl Object {
         }
     }
 
-    fn derivative_onsurface(&self) -> VectorN<f64, U7> {
+    fn derivative_onsurface(&self) -> SVector<f64, 7> {
         let vel = self.vel().to_omega(self.pos(), self.pos().omega());
         let coriolis_counteraction = if self.counteract_coriolis {
             self.sim_state.coriolis_counteraction()
@@ -191,10 +191,10 @@ impl Object {
         let acc_up = acc.dot(&up);
         acc += (-v * v / r - acc_up) * up;
 
-        VectorN::<f64, U7>::from_column_slice(&[vel.x, vel.y, vel.z, acc.x, acc.y, acc.z, 1.0])
+        SVector::<f64, 7>::from_column_slice(&[vel.x, vel.y, vel.z, acc.x, acc.y, acc.z, 1.0])
     }
 
-    pub fn derivative(&self) -> VectorN<f64, U7> {
+    pub fn derivative(&self) -> SVector<f64, 7> {
         match self.state {
             ObjectState::InFlight => self.derivative_inflight(),
             ObjectState::OnSurface => self.derivative_onsurface(),
@@ -379,9 +379,9 @@ impl Object {
 }
 
 impl State for Object {
-    type Derivative = VectorN<f64, U7>;
+    type Derivative = SVector<f64, 7>;
 
-    fn shift_in_place(&mut self, dir: &VectorN<f64, U7>, amount: f64) {
+    fn shift_in_place(&mut self, dir: &SVector<f64, 7>, amount: f64) {
         let shift = dir * amount;
         let vel = Vector3::from_column_slice(&shift.as_ref()[0..3]);
         let acc = Vector3::from_column_slice(&shift.as_ref()[3..6]);
