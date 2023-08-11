@@ -169,9 +169,9 @@ impl Renderer {
         // how much has the frame rotated with respect to the sky
         let skybox_ang = -omega * state.render_settings.max_t;
 
-        let dist = state.distance;
-        let lat = state.lat;
-        let lon = state.lon;
+        let dist = state.camera_state.external.distance;
+        let lat = state.camera_state.external.lat;
+        let lon = state.camera_state.external.lon;
 
         let camera_ang = state.ang - omega * state.t;
 
@@ -179,8 +179,9 @@ impl Renderer {
         let view_rot = Matrix4::new_rotation(Vector3::new(lat as f32, 0.0, 0.0))
             * Matrix4::new_rotation(Vector3::new(0.0, -lon - camera_ang as f32, 0.0));
         let view_trans = Matrix4::new_translation(&Vector3::new(0.0, 0.0, -dist));
-        let camera_orient = Matrix4::new_rotation(Vector3::new(0.0, state.turn, 0.0))
-            * Matrix4::new_rotation(Vector3::new(state.tilt, 0.0, 0.0));
+        let camera_orient =
+            Matrix4::new_rotation(Vector3::new(0.0, state.camera_state.external.turn, 0.0))
+                * Matrix4::new_rotation(Vector3::new(state.camera_state.external.tilt, 0.0, 0.0));
         let matrix = perspective * camera_orient * view_trans * view_rot;
 
         let earth_rotation = Matrix4::new_rotation(Vector3::new(0.0, earth_ang as f32, 0.0));

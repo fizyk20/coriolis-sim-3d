@@ -34,15 +34,69 @@ impl Default for RenderSettings {
     }
 }
 
-pub struct State {
-    pub t: f64,
-    pub omega: f64,
-    pub ang: f64,
+#[derive(Debug, Clone, Copy)]
+pub struct ExternalState {
     pub lat: f32,
     pub lon: f32,
     pub tilt: f32,
     pub turn: f32,
     pub distance: f32,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct FollowingState {
+    pub obj: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StateTag {
+    External,
+    Following,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CameraState {
+    pub tag: StateTag,
+    pub external: ExternalState,
+    pub following: FollowingState,
+}
+
+impl CameraState {
+    pub fn drag(&mut self, drag_delta: Vec2) {
+        if self.tag == StateTag::External {
+            self.external.lat = (self.external.lat + drag_delta.y * 0.01).clamp(-1.57, 1.57);
+            self.external.lon = (self.external.lon - drag_delta.x * 0.01) % 6.2831853;
+        }
+    }
+
+    pub fn shift_drag(&mut self, drag_delta: Vec2) {
+        if self.tag == StateTag::External {
+            self.external.tilt = (self.external.tilt + drag_delta.y * 0.01).clamp(-1.57, 1.57);
+            self.external.turn = (self.external.turn + drag_delta.x * 0.01).clamp(-3.14, 3.14);
+        }
+    }
+
+    pub fn scroll(&mut self, scroll: glutin::event::MouseScrollDelta) {
+        use glutin::event::MouseScrollDelta::*;
+        match scroll {
+            LineDelta(_x, y) => {
+                if self.tag == StateTag::External {
+                    self.external.distance =
+                        (self.external.distance / 2.0_f32.powf(y as f32 * 0.2)).clamp(6378e3, 2e9);
+                }
+            }
+            PixelDelta(pos) => {
+                println!("PixelDelta({:?})", pos);
+            }
+        }
+    }
+}
+
+pub struct State {
+    pub t: f64,
+    pub omega: f64,
+    pub ang: f64,
+    pub camera_state: CameraState,
     pub running: bool,
     pub time_step: f64,
     pub objects: Vec<Object>,
@@ -57,11 +111,17 @@ impl Default for State {
             t: 0.0,
             omega: 1.0,
             ang: 0.0,
-            lat: 0.0,
-            lon: 0.0,
-            tilt: 0.0,
-            turn: 0.0,
-            distance: 60e6,
+            camera_state: CameraState {
+                tag: StateTag::External,
+                external: ExternalState {
+                    lat: 0.0,
+                    lon: 0.0,
+                    tilt: 0.0,
+                    turn: 0.0,
+                    distance: 60e6,
+                },
+                following: FollowingState { obj: 0 },
+            },
             running: false,
             time_step: 10.0,
             objects: vec![],
@@ -73,28 +133,6 @@ impl Default for State {
 }
 
 impl State {
-    pub fn drag(&mut self, drag_delta: Vec2) {
-        self.lat = (self.lat + drag_delta.y * 0.01).clamp(-1.57, 1.57);
-        self.lon = (self.lon - drag_delta.x * 0.01) % 6.2831853;
-    }
-
-    pub fn shift_drag(&mut self, drag_delta: Vec2) {
-        self.tilt = (self.tilt + drag_delta.y * 0.01).clamp(-1.57, 1.57);
-        self.turn = (self.turn + drag_delta.x * 0.01).clamp(-3.14, 3.14);
-    }
-
-    pub fn scroll(&mut self, scroll: glutin::event::MouseScrollDelta) {
-        use glutin::event::MouseScrollDelta::*;
-        match scroll {
-            LineDelta(_x, y) => {
-                self.distance = (self.distance / 2.0_f32.powf(y as f32 * 0.2)).clamp(6378e3, 2e9);
-            }
-            PixelDelta(pos) => {
-                println!("PixelDelta({:?})", pos);
-            }
-        }
-    }
-
     pub fn reset_state(&mut self) {
         self.t = 0.0;
         self.ang = 0.0;

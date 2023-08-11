@@ -53,9 +53,9 @@ fn main() {
                         let (id, rect) = ui.allocate_space(available_size);
                         let response = ui.interact(rect, id, egui::Sense::drag());
                         if ui.input().modifiers.shift {
-                            state.shift_drag(response.drag_delta());
+                            state.camera_state.shift_drag(response.drag_delta());
                         } else {
-                            state.drag(response.drag_delta());
+                            state.camera_state.drag(response.drag_delta());
                         }
                     });
 
@@ -110,9 +110,14 @@ fn main() {
 
                     ui.separator();
 
-                    ui.label(format!("Current lat: {:3.1}", state.lat.to_degrees()));
-                    let mut lon =
-                        (state.lon as f64 + state.ang - OMEGA * state.t).to_degrees() % 360.0;
+                    ui.label(format!(
+                        "Current lat: {:3.1}",
+                        state.camera_state.external.lat.to_degrees()
+                    ));
+                    let mut lon = (state.camera_state.external.lon as f64 + state.ang
+                        - OMEGA * state.t)
+                        .to_degrees()
+                        % 360.0;
                     if lon > 180.0 {
                         lon -= 360.0;
                     }
@@ -280,7 +285,7 @@ fn main() {
                         *control_flow = glutin::event_loop::ControlFlow::Exit;
                     }
                     WindowEvent::MouseWheel { delta, .. } => {
-                        state.scroll(delta);
+                        state.camera_state.scroll(delta);
                     }
                     _ => (),
                 }
