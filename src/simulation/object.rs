@@ -22,12 +22,20 @@ enum ObjectState {
 }
 
 #[derive(Debug, Clone, Copy)]
-struct SimState {
+pub struct SimState {
     pos: Position,
     vel: Velocity,
 }
 
 impl SimState {
+    pub fn pos(&self) -> &Position {
+        &self.pos
+    }
+
+    pub fn vel(&self) -> &Velocity {
+        &self.vel
+    }
+
     fn coriolis_counteraction(&self) -> Vector3<f64> {
         let pos = self.pos.to_omega(OMEGA);
         let vel = self.vel.to_omega(self.pos, OMEGA);
@@ -246,6 +254,18 @@ impl Object {
                 self.sim_state.vel = vel.to_omega(self.pos(), self.vel().omega());
             }
         }
+    }
+
+    pub fn last_sim_state(&self, max_t: f64) -> SimState {
+        self.path
+            .iter()
+            .copied()
+            .chain(iter::once(self.sim_state))
+            .enumerate()
+            .take_while(|(i, state)| *i == 0 || state.pos.t() < max_t)
+            .map(|(_, state)| state)
+            .last()
+            .unwrap()
     }
 
     pub fn draw(

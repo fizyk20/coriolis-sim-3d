@@ -184,8 +184,10 @@ impl Renderer {
             return Self::view_external(state);
         }
 
-        let pos = state.objects[follow_obj].pos().to_omega(OMEGA);
-        let vel = state.objects[follow_obj].vel().to_omega(pos, OMEGA).vel();
+        let sim_state = state.objects[follow_obj].last_sim_state(state.render_settings.max_t);
+
+        let pos = sim_state.pos().to_omega(OMEGA);
+        let vel = sim_state.vel().to_omega(pos, OMEGA).vel();
         let up = surface_normal(&pos.pos());
         let front = (vel - vel.dot(&up) * up).normalize();
 
