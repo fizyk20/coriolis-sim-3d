@@ -221,7 +221,8 @@ impl ObjectDescription {
                 vec![
                     create_object(self.lat_f(), self.lon_f(), self.elev_f(), vel_e, vel_n, 0.0)
                         .with_color(self.color[0], self.color[1], self.color[2])
-                        .counteract_coriolis(true),
+                        .counteract_coriolis(true)
+                        .with_const_alt(self.elev_f()),
                 ]
             }
         }

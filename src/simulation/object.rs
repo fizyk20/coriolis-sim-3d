@@ -17,8 +17,8 @@ const MAX_PATH_LEN: usize = 50000;
 
 #[derive(Debug, Clone, Copy)]
 enum ObjectState {
-    InFlight,
-    OnSurface,
+    FreeFlight,
+    ConstantAltitude(f64),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -83,7 +83,7 @@ impl Object {
             friction: 0.0,
             attractor: None,
             counteract_coriolis: false,
-            state: ObjectState::InFlight,
+            state: ObjectState::FreeFlight,
         }
     }
 
@@ -111,6 +111,13 @@ impl Object {
 
     pub fn with_friction(self, friction: f64) -> Self {
         Self { friction, ..self }
+    }
+
+    pub fn with_const_alt(self, alt: f64) -> Self {
+        Self {
+            state: ObjectState::ConstantAltitude(alt),
+            ..self
+        }
     }
 
     pub fn as_pendulum(self, coeff: f64) -> Self {
@@ -167,7 +174,7 @@ impl Object {
         }
     }
 
-    fn derivative_onsurface(&self) -> SVector<f64, 7> {
+    fn derivative_const_alt(&self, alt: f64) -> SVector<f64, 7> {
         let vel = self.vel().to_omega(self.pos(), self.pos().omega());
         let coriolis_counteraction = if self.counteract_coriolis {
             self.sim_state.coriolis_counteraction()
@@ -184,20 +191,20 @@ impl Object {
         let vel = vel.vel();
 
         // make sure that the total vertical acceleration makes the object conform to the curvature
-        // of the surface
+        // of the surface of constant altitude
         let up = surface_normal(&self.pos().pos());
         let v = vel.norm();
         let r = r_curv(&self.pos().pos());
         let acc_up = acc.dot(&up);
-        acc += (-v * v / r - acc_up) * up;
+        acc += (-v * v / (r + alt) - acc_up) * up;
 
         SVector::<f64, 7>::from_column_slice(&[vel.x, vel.y, vel.z, acc.x, acc.y, acc.z, 1.0])
     }
 
     pub fn derivative(&self) -> SVector<f64, 7> {
         match self.state {
-            ObjectState::InFlight => self.derivative_inflight(),
-            ObjectState::OnSurface => self.derivative_onsurface(),
+            ObjectState::FreeFlight => self.derivative_inflight(),
+            ObjectState::ConstantAltitude(alt) => self.derivative_const_alt(alt),
         }
     }
 
@@ -217,12 +224,18 @@ impl Object {
         let lat_r_gc = (pos.pos().y / r).asin();
         let earth_r = earth_radius(lat_r_gc);
 
-        if r < earth_r {
-            self.state = ObjectState::OnSurface;
+        let maybe_target_r = match self.state {
+            ObjectState::FreeFlight if r < earth_r => Some(earth_r),
+            ObjectState::ConstantAltitude(alt) => Some(earth_r + alt),
+            _ => None,
+        };
+
+        if let Some(target_r) = maybe_target_r {
+            self.state = ObjectState::ConstantAltitude(target_r - earth_r);
 
             let mut vel = self.vel().to_omega(self.pos(), 0.0);
-            self.sim_state.pos.mul(earth_r / r);
-            vel.mul(r / earth_r);
+            self.sim_state.pos.mul(target_r / r);
+            vel.mul(r / target_r);
             self.sim_state.vel = vel.to_omega(self.pos(), self.pos().omega());
             // cancel the vertical component of the velocity if negative
             let normal = surface_normal(&pos.pos());

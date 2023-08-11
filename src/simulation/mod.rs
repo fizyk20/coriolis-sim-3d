@@ -101,8 +101,10 @@ pub fn surface_normal(pos: &Vector3<f64>) -> Vector3<f64> {
 }
 
 pub fn r_curv(pos: &Vector3<f64>) -> f64 {
-    let r2 = pos.dot(&pos);
-    let coeff = (R_EQU * R_EQU + R_POL * R_POL - r2).sqrt();
+    let r = pos.norm();
+    let lat_r_gc = (pos.y / r).asin();
+    let earth_r = earth_radius(lat_r_gc);
+    let coeff = (R_EQU * R_EQU + R_POL * R_POL - earth_r * earth_r).sqrt();
     coeff * coeff * coeff / R_EQU / R_POL
 }
 
