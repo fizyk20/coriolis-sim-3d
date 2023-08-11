@@ -1,6 +1,8 @@
 mod description;
 mod utils;
 
+use std::fmt;
+
 use egui::Vec2;
 use glium::glutin;
 
@@ -61,6 +63,21 @@ pub struct CameraState {
     pub following: FollowingState,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CameraStateDef {
+    External,
+    Following(usize),
+}
+
+impl fmt::Display for CameraStateDef {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CameraStateDef::External => write!(f, "External"),
+            CameraStateDef::Following(obj) => write!(f, "Following object {}", obj),
+        }
+    }
+}
+
 impl CameraState {
     pub fn drag(&mut self, drag_delta: Vec2) {
         if self.tag == StateTag::External {
@@ -87,6 +104,25 @@ impl CameraState {
             }
             PixelDelta(pos) => {
                 println!("PixelDelta({:?})", pos);
+            }
+        }
+    }
+
+    pub fn as_def(&self) -> CameraStateDef {
+        match self.tag {
+            StateTag::External => CameraStateDef::External,
+            StateTag::Following => CameraStateDef::Following(self.following.obj),
+        }
+    }
+
+    pub fn set_from_def(&mut self, cam_def: CameraStateDef) {
+        match cam_def {
+            CameraStateDef::External => {
+                self.tag = StateTag::External;
+            }
+            CameraStateDef::Following(obj) => {
+                self.tag = StateTag::Following;
+                self.following.obj = obj;
             }
         }
     }

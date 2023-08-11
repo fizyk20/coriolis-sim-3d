@@ -10,7 +10,7 @@ use renderer::Renderer;
 
 use crate::{
     simulation::OMEGA,
-    state::{ObjectDescription, ObjectKind, ObjectKindTag, State, StateTag},
+    state::{CameraStateDef, ObjectDescription, ObjectKind, ObjectKindTag, State, StateTag},
 };
 
 use interface::display_object;
@@ -132,6 +132,30 @@ fn main() {
                     ui.add(egui::Slider::new(&mut state.omega, 0.0..=1.0));
                     ui.label("Time step:");
                     ui.add(egui::Slider::new(&mut state.time_step, 1.0..=1000.0).logarithmic(true));
+
+                    ui.separator();
+
+                    ui.horizontal(|ui| {
+                        ui.label("Camera:");
+                        let mut selected_camera = state.camera_state.as_def();
+                        egui::ComboBox::from_label("")
+                            .selected_text(format!("{}", selected_camera))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut selected_camera,
+                                    CameraStateDef::External,
+                                    format!("{}", CameraStateDef::External),
+                                );
+                                for i in 0..state.objects.len() {
+                                    ui.selectable_value(
+                                        &mut selected_camera,
+                                        CameraStateDef::Following(i),
+                                        format!("{}", CameraStateDef::Following(i)),
+                                    );
+                                }
+                            });
+                        state.camera_state.set_from_def(selected_camera);
+                    });
 
                     ui.separator();
 
