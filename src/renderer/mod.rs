@@ -223,14 +223,14 @@ impl Renderer {
         // how much has Earth rotated since t=0
         let earth_ang = (OMEGA - omega) * state.render_settings.max_t;
         // how much has the frame rotated with respect to the sky
-        let skybox_ang = -omega * state.render_settings.max_t;
+        let skybox_ang = -omega * state.render_settings.max_t + state.render_settings.sky_rotation.to_radians();
 
         let earth_rotation = Matrix4::new_rotation(Vector3::new(0.0, earth_ang as f32, 0.0));
         let skybox_rotation = Matrix4::new_rotation(Vector3::new(0.0, skybox_ang as f32, 0.0));
 
         let galactic_pole_rot = galactic_matrix();
 
-        let perspective = Matrix4::new_perspective(aspect, 45.0_f32.to_radians(), 1000.0, 1e9);
+        let perspective = Matrix4::new_perspective(aspect, state.render_settings.fov.to_radians(), 1000.0, 1e9);
         let (view_rot, view_trans, camera_orient) = match state.camera_state.tag {
             StateTag::External => Self::view_external(state),
             StateTag::Following => Self::view_following(state, &earth_rotation),

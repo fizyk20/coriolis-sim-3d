@@ -46,6 +46,10 @@ fn main() {
             }
 
             let needs_repaint = egui_glium.run(&display, |egui_ctx| {
+                if state.running {
+                    state.render_settings.max_t = state.t;
+                }
+
                 egui::CentralPanel::default()
                     .frame(egui::Frame::none())
                     .show(egui_ctx, |ui| {
@@ -59,7 +63,7 @@ fn main() {
                         }
                     });
 
-                egui::Window::new("Simulation data").show(egui_ctx, |ui| {
+                egui::Window::new("Simulation controls").show(egui_ctx, |ui| {
                     ui.horizontal(|ui| {
                         if state.running {
                             if ui.button("Pause simulation").clicked() {
@@ -73,18 +77,30 @@ fn main() {
                         if ui.button("Reset").clicked() {
                             state.reset_state();
                         }
+
+                        if ui.button("Quit").clicked() {
+                            quit = true;
+                        }
                     });
 
-                    if state.running {
-                        state.render_settings.max_t = state.t;
-                    }
                     ui.label("Time range to render:");
                     ui.add(egui::Slider::new(
                         &mut state.render_settings.max_t,
                         0.0..=state.t,
                     ));
+                });
 
-                    ui.separator();
+                egui::Window::new("Simulation data").show(egui_ctx, |ui| {
+                    ui.label("Field of view:");
+                    ui.add(
+                        egui::Slider::new(&mut state.render_settings.fov, 5.0..=120.0).step_by(1.0),
+                    );
+
+                    ui.label("Rotate the sky (degrees):");
+                    ui.add(
+                        egui::Slider::new(&mut state.render_settings.sky_rotation, 0.0..=360.0)
+                            .step_by(1.0),
+                    );
 
                     ui.checkbox(&mut state.render_settings.draw_grid, "Draw grid");
                     ui.checkbox(
@@ -175,12 +191,6 @@ fn main() {
                             });
                         }
                     });
-
-                    ui.separator();
-
-                    if ui.button("Quit").clicked() {
-                        quit = true;
-                    }
                 });
 
                 let mut edit_result = EditResult::None;

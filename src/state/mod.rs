@@ -11,6 +11,7 @@ use crate::simulation::Object;
 pub use description::{InitialStateDefinition, ObjectDescription, ObjectKind, ObjectKindTag};
 
 pub struct RenderSettings {
+    pub fov: f32,
     pub draw_grid: bool,
     pub draw_solid_surface: bool,
     pub use_texture: bool,
@@ -19,11 +20,13 @@ pub struct RenderSettings {
     pub vel_scale: f64,
     pub force_scale: f64,
     pub max_t: f64,
+    pub sky_rotation: f64,
 }
 
 impl Default for RenderSettings {
     fn default() -> Self {
         Self {
+            fov: 45.0,
             draw_grid: true,
             draw_solid_surface: true,
             use_texture: true,
@@ -32,6 +35,7 @@ impl Default for RenderSettings {
             vel_scale: 1e4,
             force_scale: 1e4,
             max_t: 0.0,
+            sky_rotation: 0.0,
         }
     }
 }
